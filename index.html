@@ -11,13 +11,22 @@
     <div id="hud" hidden>
       <div id="crosshair"></div>
       <p id="hint" hidden>Hold a mouse button and drag to look · Esc to pause</p>
+      <div id="objective">
+        <span id="maze-cheese"></span>
+        <span id="objective-label">cheese left in the maze</span>
+      </div>
+      <div id="carried" title="Cheese you are carrying">
+        <img id="carried-icon" alt="" />
+        <span id="carried-count">0</span>
+      </div>
+      <p id="toast" hidden></p>
     </div>
     <div id="debug"></div>
 
     <div id="overlay">
       <div class="panel">
-        <h1>Rat's Maze</h1>
-        <p id="overlay-status">Prototype · step 1: walk the maze</p>
+        <h1 id="overlay-title">Rat's Maze</h1>
+        <p id="overlay-status">Prototype · step 2: gather the cheese</p>
         <button id="play-button" type="button">Enter the maze</button>
         <p id="touch-note" hidden>Rat's Maze needs a keyboard and mouse.</p>
         <dl class="controls">
@@ -26,6 +35,7 @@
           <dt>Esc</dt><dd>Pause</dd>
           <dt>P</dt><dd>Retro look: off / medium / heavy</dd>
           <dt>N</dt><dd>New maze</dd>
+          <dt>K</dt><dd>Testing: collect all cheese</dd>
         </dl>
       </div>
     </div>

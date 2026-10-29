@@ -1,7 +1,7 @@
 # Art slots
 
-Every texture in the game is a PNG in `src/assets/textures/`. Right now each one is a
-placeholder that shows its own file name and size.
+Every texture in the game is a PNG in `src/assets/textures/`, and HUD icons are in
+`src/assets/ui/`. Right now each one is a placeholder that shows its own file name and size.
 
 **To put your drawing in the game:** export it from Procreate as PNG at the size listed,
 save it over the placeholder with the same file name, and refresh the browser.
@@ -17,17 +17,23 @@ so a drawing that looks right on the iPad will look right in the game.
 | `floor.png` | 512 × 512 | The floor. One image = one corridor square. | Must tile on all four edges. |
 | `ceiling.png` | 512 × 512 | The ceiling. One image = one corridor square. | Must tile on all four edges. |
 
+## Cheese and the exit (step 2)
+
+| File | Canvas | Where it appears | Notes |
+|---|---|---|---|
+| `door.png` | 512 × 512 | The exit door, floor to ceiling, one corridor wide. | Drawn as seen from the corridor. |
+| `cheese.png` | 512 × 512 | The floating cheese wedges, the cheese wheel behind the exit, and the cheese compass arrow. | Each wedge shows only part of the image, so draw it as cheese surface (holes, texture) that tiles, not as one wedge. |
+| `ui/hud-cheese.png` | 256 × 256 | The cheese icon next to your carried count, bottom right. | Transparent background. Shown at about 48 × 48. |
+
 ## Coming in later steps
 
 | File | Canvas | What |
 |---|---|---|
-| `door.png` | 512 × 1024 | The exit door |
-| `cheese.png` | 512 × 512 | Cheese wedge and the compass arrow |
 | Gunny | 1024 × 1024 | Gunny as other players see him (painted on the 3D model in Procreate) |
 | Gunny's arms | 1024 × 1024 | First-person paw (painted on the 3D model in Procreate) |
 | Cheese gun | 1024 × 1024 | Gunny's crafted gun (painted on the 3D model in Procreate) |
 | Hero portrait | 1024 × 1536 | Character select card |
-| HUD icons | 256 × 256 each | Cheese counter, health, and so on |
+| More HUD icons | 256 × 256 each | Health, cheese gun, and so on |
 
 ## Regenerating placeholders
 

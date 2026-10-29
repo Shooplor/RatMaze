@@ -75,6 +75,12 @@ export class KeyboardMouseController {
     }, 400);
   }
 
+  /** Stops taking input and gives the mouse back, e.g. when a round ends. */
+  release() {
+    if (document.pointerLockElement === this.element) document.exitPointerLock();
+    this.setActive(false);
+  }
+
   setActive(active) {
     if (this.active === active) return;
     this.active = active;

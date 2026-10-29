@@ -12,6 +12,9 @@ export const BRAID = 0.6;         // share of dead ends knocked open into loops 
 export const RAT_RADIUS = 0.3;
 export const RAT_SPEED = 4.2;     // units per second
 
+export const CHEESE_REACH = TILE * 0.45; // how close a rat gets to take a piece (covers the corridor width)
+export const CHEESE_HEIGHT = 0.95;       // how high the cheese floats
+
 export const TICK_RATE = 60;      // simulation steps per second
 
 export const FOV = 65;            // vertical degrees; narrower feels more closed in

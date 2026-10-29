@@ -93,3 +93,37 @@ test('outside the grid counts as wall', () => {
   assert.ok(maze.isWall(0, 2));
   assert.ok(maze.isOpen(2, 1));
 });
+
+test('the exit is a door in the outer wall, reachable, and fair to both spawns', () => {
+  for (let seed = 1; seed <= 50; seed++) {
+    const maze = Maze.generate({ cols: 21, rows: 21, seed, braid: 0.6 });
+    const { cx, cz, dx, dz } = maze.exit;
+    const onBorder = cx === 0 || cz === 0 || cx === maze.cols - 1 || cz === maze.rows - 1;
+    assert.ok(onBorder, `seed ${seed}: exit not on the border`);
+    assert.ok(maze.isWall(cx, cz), 'the door is solid until it opens');
+    assert.ok(maze.isWall(cx + dx, cz + dz) && !maze.inBounds(cx + dx, cz + dz), 'outside is beyond the grid');
+    assert.ok(maze.isOpen(cx - dx, cz - dz), 'a corridor leads to the door');
+
+    // No other spot in the outer wall is fairer than the one chosen.
+    const fromPlayer = maze.distancesFrom(maze.spawns.player);
+    const fromEnemy = maze.distancesFrom(maze.spawns.enemy);
+    const gap = (x, z) => Math.abs(fromPlayer[z * maze.cols + x] - fromEnemy[z * maze.cols + x]);
+    const chosen = gap(cx - dx, cz - dz);
+    for (let i = 1; i < maze.cols - 1; i++) {
+      for (const [x, z] of [[i, 1], [i, maze.rows - 2], [1, i], [maze.cols - 2, i]]) {
+        if (maze.isOpen(x, z)) assert.ok(gap(x, z) >= chosen, `seed ${seed}: fairer exit near ${x},${z}`);
+      }
+    }
+  }
+});
+
+test('hand-drawn layouts can place the exit with D', () => {
+  const maze = Maze.fromAscii(`
+    ###D###
+    #P....#
+    #######
+  `);
+  assert.deepEqual(maze.exit, { cx: 3, cz: 0, dx: 0, dz: -1 });
+  assert.ok(maze.isWall(3, 0));
+  assert.equal(maze.toAscii().split('\n')[0], '###D###');
+});

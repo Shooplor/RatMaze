@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import {
-  BRAID, EYE_HEIGHT, FOG_COLOR, FOG_FAR, FOG_NEAR, FOV, MAZE_COLS, MAZE_ROWS,
+  BRAID, CHEESE_REACH, EYE_HEIGHT, FOG_COLOR, FOG_FAR, FOG_NEAR, FOV, MAZE_COLS, MAZE_ROWS,
   RAT_RADIUS, RAT_SPEED, TICK_RATE, TILE,
 } from './config.js';
 import { Maze } from './sim/maze.js';
+import { Match } from './sim/match.js';
 import { randomSeed } from './sim/random.js';
 import { Rat, yawFor } from './sim/rat.js';
 import { buildWorld } from './render/world.js';
+import { buildCheese } from './render/cheeseView.js';
+import { buildExit } from './render/exitView.js';
+import { createOverlay } from './render/overlay.js';
+import { createCompass } from './render/compass.js';
 import { FirstPersonView } from './render/firstPersonView.js';
 import { setCrispTextures, setMaxAnisotropy } from './render/textures.js';
 import { KeyboardMouseController } from './input/keyboardMouse.js';
@@ -22,6 +27,7 @@ const RETRO_LEVELS = [
 // --- Renderer, scene, camera -----------------------------------------------
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.autoClear = false; // the maze and the overlay are drawn one after the other
 document.getElementById('game').appendChild(renderer.domElement);
 setMaxAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 
@@ -32,6 +38,9 @@ scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
 const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, FOG_FAR + TILE);
 scene.add(camera); // the camera carries the rat's own light, so it must be in the scene
 
+const overlay = createOverlay();
+const compass = createCompass(overlay);
+
 const controller = new KeyboardMouseController(renderer.domElement);
 const view = new FirstPersonView(camera);
 
@@ -40,19 +49,21 @@ const view = new FirstPersonView(camera);
 
 let seed;
 let maze;
-let world;
 let player;
+let match;
+let world;
+let cheeseView;
+let exitView;
 
 function loadMaze(newSeed) {
-  if (world) {
-    scene.remove(world.group);
-    world.dispose();
+  for (const old of [world, cheeseView, exitView]) {
+    if (!old) continue;
+    scene.remove(old.group);
+    old.dispose();
   }
 
   seed = newSeed;
   maze = Maze.generate({ cols: MAZE_COLS, rows: MAZE_ROWS, seed, braid: BRAID, tileSize: TILE });
-  world = buildWorld(maze);
-  scene.add(world.group);
 
   const spawn = maze.spawns.player;
   const spawnPos = maze.cellCenter(spawn.cx, spawn.cz);
@@ -66,15 +77,61 @@ function loadMaze(newSeed) {
   });
   controller.setView(player.yaw, 0);
   camera.position.set(player.x, EYE_HEIGHT, player.z);
+  match = new Match(maze, [player], { reach: CHEESE_REACH });
+
+  world = buildWorld(maze);
+  cheeseView = buildCheese(maze, match.cheese.remainingTiles());
+  exitView = buildExit(maze);
+  for (const v of [world, cheeseView, exitView]) scene.add(v.group);
+  compass.hide();
+
+  hud.setResult(null);
+  hud.showExitOpen(false);
+  hud.setMazeCheese(match.cheese.remaining);
+  hud.setCarried(0);
+  hud.clearToast();
+
   accumulator = 0;
   showSeedInAddress(seed);
 
-  if (import.meta.env.DEV) window.ratMaze = { maze, player, controller, camera, scene };
+  if (import.meta.env.DEV) window.ratMaze = { maze, player, match, controller, camera, scene };
+}
+
+// What the rules report, shown on screen.
+function handleEvent(event) {
+  switch (event.type) {
+    case 'collected':
+      cheeseView.collect(event.tiles);
+      hud.setMazeCheese(match.cheese.remaining);
+      if (event.rat === player) hud.setCarried(player.carried, { bump: true });
+      break;
+    case 'exitOpened':
+      exitView.open();
+      compass.show();
+      hud.showExitOpen(true);
+      hud.toast('All the cheese is gathered. The exit is open!');
+      break;
+    case 'escaped':
+      compass.hide();
+      hud.clearToast();
+      hud.setCarried(player.carried);
+      hud.setResult({
+        title: 'You escaped!',
+        text: `You delivered ${event.rat.delivered} cheese in ${formatTime(match.time)}.`,
+      });
+      controller.release();
+      break;
+  }
 }
 
 // --- UI and settings -------------------------------------------------------
 
-const hud = createHud({ onPlay: () => controller.requestLock() });
+const hud = createHud({
+  onPlay: () => {
+    if (match.state === 'over') loadMaze(randomSeed());
+    controller.requestLock();
+  },
+});
 controller.onActiveChange = (active) => hud.setPlaying(active, { dragToLook: controller.dragToLook });
 renderer.domElement.addEventListener('click', () => {
   if (!controller.active) controller.requestLock();
@@ -91,6 +148,8 @@ document.addEventListener('keydown', (e) => {
     applyRetro();
   } else if (e.code === 'KeyN') {
     loadMaze(randomSeed());
+  } else if (e.code === 'KeyK' && controller.active) {
+    match.giveAllCheese(player); // testing shortcut, until there's a quicker way to see the exit
   }
 });
 
@@ -118,17 +177,26 @@ function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.25);
   lastTime = now;
 
-  if (controller.active) {
+  if (controller.active && match.state !== 'over') {
     accumulator += dt;
     while (accumulator >= TICK) {
       player.applyCommand(controller.getCommand(), TICK, maze);
+      match.update(TICK);
       accumulator -= TICK;
     }
   }
+  match.drainEvents().forEach(handleEvent);
 
-  view.update(player, accumulator / TICK, controller.getCommand(), dt);
-  world.update(now / 1000);
+  const time = now / 1000;
+  const cmd = controller.getCommand();
+  view.update(player, accumulator / TICK, cmd, dt);
+  for (const v of [world, cheeseView, exitView]) v.update(time, dt);
+  compass.update(dt, camera.position, cmd.yaw, exitView.position);
+
+  renderer.clear();
   renderer.render(scene, camera);
+  renderer.clearDepth();
+  renderer.render(overlay.scene, overlay.camera);
   updateDebug(dt);
   requestAnimationFrame(frame);
 }
@@ -139,7 +207,13 @@ requestAnimationFrame(frame);
 function resize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  overlay.resize(camera.aspect);
   renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function formatTime(seconds) {
+  const s = Math.floor(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 function applyRetro() {
@@ -163,8 +237,8 @@ function updateDebug(dt) {
 // The maze's seed lives in the address (#maze-1234), so reloading keeps the same maze
 // and a link can be shared.
 function seedFromAddress() {
-  const match = /^#maze-(\d+)$/.exec(window.location.hash);
-  return match ? Number(match[1]) : null;
+  const found = /^#maze-(\d+)$/.exec(window.location.hash);
+  return found ? Number(found[1]) : null;
 }
 
 function showSeedInAddress(value) {

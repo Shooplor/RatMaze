@@ -49,13 +49,104 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  top: 14px;
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
   margin: 0;
   text-align: center;
   font-size: 13px;
   color: var(--muted);
   text-shadow: 0 1px 2px #000;
   pointer-events: none;
+}
+
+#objective {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-shadow: 0 2px 4px #000;
+  pointer-events: none;
+}
+
+#maze-cheese {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 34px;
+  font-weight: bold;
+  line-height: 1;
+  color: var(--cheese);
+  font-variant-numeric: tabular-nums;
+}
+
+#objective-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--parchment);
+}
+
+#objective.exit-open #objective-label {
+  font-size: 14px;
+  color: var(--cheese);
+}
+
+#carried {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+#carried-icon {
+  width: 48px;
+  height: 48px;
+  filter: drop-shadow(0 2px 3px #000);
+}
+
+#carried-count {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 40px;
+  font-weight: bold;
+  color: var(--cheese);
+  text-shadow: 0 2px 4px #000;
+  font-variant-numeric: tabular-nums;
+}
+
+#carried.bump {
+  animation: bump 0.25s ease-out;
+}
+
+@keyframes bump {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 10px 18px;
+  border-radius: 6px;
+  background: rgba(10, 8, 6, 0.75);
+  color: var(--cheese);
+  font-size: 18px;
+  text-align: center;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #carried.bump {
+    animation: none;
+  }
 }
 
 #touch-note {
@@ -80,7 +171,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: radial-gradient(ellipse at center, rgba(10, 8, 6, 0.55), rgba(10, 8, 6, 0.92));
+  background: radial-gradient(ellipse at center, rgba(10, 8, 6, 0.8), rgba(10, 8, 6, 0.95));
 }
 
 #overlay[hidden] {

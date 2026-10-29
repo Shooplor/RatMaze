@@ -20,6 +20,9 @@ export class Maze {
     this.seed = null;
     this.spawns = { player: null, enemy: null };
     this.lamps = [];
+    // The exit door: a tile in the outer wall, solid until the door opens.
+    // (dx, dz) points out of the maze, from the corridor into the door tile.
+    this.exit = null;
   }
 
   /** Random maze from a seed: carve a perfect maze, then braid some dead ends into loops. */
@@ -37,12 +40,13 @@ export class Maze {
     maze.spawns.player = { cx: 1, cz: 1 };
     maze.spawns.enemy = { cx: cols - 2, cz: rows - 2 };
     maze.lamps = placeLamps(maze, rng);
+    maze.exit = placeExit(maze, rng);
     return maze;
   }
 
   /**
    * Hand-drawn layout: '#' is wall, anything else is floor.
-   * Markers: P = player spawn, E = enemy spawn, L = lamp.
+   * Markers: P = player spawn, E = enemy spawn, L = lamp, D = exit door (in the outer wall).
    */
   static fromAscii(text, tileSize = 1) {
     const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -53,6 +57,10 @@ export class Maze {
     lines.forEach((line, cz) => {
       [...line].forEach((ch, cx) => {
         if (ch === '#') return;
+        if (ch === 'D') {
+          maze.exit = { cx, cz };
+          return; // the door tile stays solid until it opens
+        }
         maze.setTile(cx, cz, OPEN);
         if (ch === 'P') maze.spawns.player = { cx, cz };
         else if (ch === 'E') maze.spawns.enemy = { cx, cz };
@@ -63,6 +71,11 @@ export class Maze {
     const open = maze.openCells();
     maze.spawns.player ??= open[0];
     maze.spawns.enemy ??= open[open.length - 1];
+    if (maze.exit) {
+      const { cx, cz } = maze.exit;
+      const [dx, dz] = DIRS.find(([dx, dz]) => maze.isOpen(cx - dx, cz - dz)) ?? DIRS[0];
+      maze.exit = { cx, cz, dx, dz };
+    }
     return maze;
   }
 
@@ -71,12 +84,14 @@ export class Maze {
     for (const { cx, cz } of this.lamps) marker.set(`${cx},${cz}`, 'L');
     if (this.spawns.enemy) marker.set(`${this.spawns.enemy.cx},${this.spawns.enemy.cz}`, 'E');
     if (this.spawns.player) marker.set(`${this.spawns.player.cx},${this.spawns.player.cz}`, 'P');
+    if (this.exit) marker.set(`${this.exit.cx},${this.exit.cz}`, 'D');
 
     const lines = [];
     for (let cz = 0; cz < this.rows; cz++) {
       let line = '';
       for (let cx = 0; cx < this.cols; cx++) {
-        line += this.isWall(cx, cz) ? '#' : (marker.get(`${cx},${cz}`) ?? '.');
+        const mark = marker.get(`${cx},${cz}`);
+        line += mark === 'D' ? 'D' : this.isWall(cx, cz) ? '#' : (mark ?? '.');
       }
       lines.push(line);
     }
@@ -122,6 +137,26 @@ export class Maze {
 
   cellCenter(cx, cz) {
     return { x: (cx + 0.5) * this.tileSize, z: (cz + 0.5) * this.tileSize };
+  }
+
+  /** Steps along corridors from a tile to every other tile (-1 where unreachable). */
+  distancesFrom({ cx, cz }) {
+    const dist = new Int32Array(this.cols * this.rows).fill(-1);
+    dist[cz * this.cols + cx] = 0;
+    const queue = [[cx, cz]];
+    for (let head = 0; head < queue.length; head++) {
+      const [x, z] = queue[head];
+      const d = dist[z * this.cols + x];
+      for (const [dx, dz] of DIRS) {
+        const nx = x + dx;
+        const nz = z + dz;
+        if (this.isOpen(nx, nz) && dist[nz * this.cols + nx] === -1) {
+          dist[nz * this.cols + nx] = d + 1;
+          queue.push([nx, nz]);
+        }
+      }
+    }
+    return dist;
   }
 
   /** Direction {dx, dz} from a tile into its first open neighbour, for facing a spawn down a corridor. */
@@ -178,6 +213,44 @@ function braidDeadEnds(maze, rng, chance) {
     const intoDeadEnd = options.filter(([dx, dz]) => maze.openNeighbourCount(cx + dx * 2, cz + dz * 2) === 1);
     const [dx, dz] = rng.pick(intoDeadEnd.length ? intoDeadEnd : options);
     maze.setTile(cx + dx, cz + dz, OPEN);
+  }
+}
+
+// The exit door goes in the outer wall where the walk from the player's spawn and from the
+// rival's spawn is as equal as possible (neither rat starts closer), and among those as
+// long as possible, so it sits deep in the maze rather than next to a start.
+function placeExit(maze, rng) {
+  const fromPlayer = maze.distancesFrom(maze.spawns.player);
+  const fromEnemy = maze.distancesFrom(maze.spawns.enemy);
+  let best = [];
+  let bestScore = null;
+
+  for (const exit of borderTiles(maze)) {
+    const inside = (exit.cz - exit.dz) * maze.cols + (exit.cx - exit.dx);
+    if (fromPlayer[inside] < 0 || fromEnemy[inside] < 0) continue; // corridor not reachable
+    const a = fromPlayer[inside];
+    const b = fromEnemy[inside];
+    const score = [Math.abs(a - b), -Math.min(a, b)];
+    const cmp = bestScore === null ? -1 : score[0] - bestScore[0] || score[1] - bestScore[1];
+    if (cmp < 0) {
+      best = [exit];
+      bestScore = score;
+    } else if (cmp === 0) {
+      best.push(exit);
+    }
+  }
+  return best.length ? rng.pick(best) : null;
+}
+
+// Outer-wall tiles, corners left out, each with the direction pointing out of the maze.
+function* borderTiles(maze) {
+  for (let cx = 1; cx < maze.cols - 1; cx++) {
+    yield { cx, cz: 0, dx: 0, dz: -1 };
+    yield { cx, cz: maze.rows - 1, dx: 0, dz: 1 };
+  }
+  for (let cz = 1; cz < maze.rows - 1; cz++) {
+    yield { cx: 0, cz, dx: -1, dz: 0 };
+    yield { cx: maze.cols - 1, cz, dx: 1, dz: 0 };
   }
 }
 

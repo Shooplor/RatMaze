@@ -40,7 +40,8 @@ function buildWalls(maze) {
   const visible = [];
   for (let cz = 0; cz < maze.rows; cz++) {
     for (let cx = 0; cx < maze.cols; cx++) {
-      if (maze.isWall(cx, cz) && maze.openNeighbourCount(cx, cz) > 0) visible.push({ cx, cz });
+      const isExit = maze.exit && cx === maze.exit.cx && cz === maze.exit.cz; // the door is built separately
+      if (maze.isWall(cx, cz) && !isExit && maze.openNeighbourCount(cx, cz) > 0) visible.push({ cx, cz });
     }
   }
 

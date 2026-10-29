@@ -18,6 +18,8 @@ export class Rat {
     this.pitch = 0;
     this.radius = radius;
     this.speed = speed;
+    this.carried = 0;   // cheese picked up and not yet taken through the exit
+    this.delivered = 0; // cheese banked at the exit: the score
   }
 
   applyCommand(cmd, dt, maze) {

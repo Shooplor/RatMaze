@@ -3,7 +3,8 @@
 A first-person maze game: gather every piece of cheese, then carry it to the exit
 before the rival rat does. Built with HTML, CSS, JavaScript and [three.js](https://threejs.org).
 
-**Status:** step 1 of the plan — walk a dark, randomly generated maze.
+**Status:** step 2 of the plan: gather every piece of cheese, then follow the cheese
+compass to the exit door. No rival rat yet.
 
 ## Run it
 
@@ -31,6 +32,7 @@ npm run build:artifact   # packs the whole game into one file: dist-artifact/rat
 | Esc | Pause |
 | P | Retro look: off / medium / heavy |
 | N | New maze |
+| K | Testing shortcut: collect all the cheese at once, to try the exit |
 
 Every maze comes from a number (its seed), shown bottom-left and at the end of the
 address (`#maze-1234`). The same seed always builds the same maze, so you can share one.
@@ -50,15 +52,22 @@ src/
   sim/             game logic only, no 3D code, so a multiplayer server can reuse it
     maze.js        maze generation (and hand-drawn ASCII layouts)
     rat.js         a rat: moves from a command, the same for player, bot and network
+    cheese.js      which tiles still hold cheese
+    match.js       the round's rules: collecting, exit opening, escaping
     collision.js   sliding along walls
     random.js      seeded random numbers
   render/          what you see (three.js)
     world.js       walls, floor, ceiling, lamps
+    cheeseView.js  the floating cheese wedges
+    exitView.js    the exit door and the lit alcove behind it
+    overlay.js     a second 3D layer drawn over the maze (compass now, paw later)
+    compass.js     the cheese arrow pointing at the exit
     firstPersonView.js  camera at the rat's eyes, the A/D tilt, the rat's own light
     textures.js    texture loading and the crisp retro filtering
   input/           keyboard and mouse → rat commands
   ui/              HTML/CSS overlay: menus, crosshair, HUD
 src/assets/textures/   the texture files
+src/assets/ui/     HUD icons
 tools/             helper scripts (placeholder textures, single-file build)
 tests/             logic tests
 ```
