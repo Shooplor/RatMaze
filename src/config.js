@@ -5,8 +5,10 @@ export const TILE = 2.2;          // corridor width, and the size of one wall/fl
 export const WALL_HEIGHT = 2.2;   // equal to TILE so each wall face shows one square texture
 export const EYE_HEIGHT = 1.55;
 
-export const MAZE_COLS = 21;
-export const MAZE_ROWS = 21;
+// Maze size in tiles (odd numbers). Play time grows with the corridors you have to walk:
+// 15 gives about 100 cheese, 17 about 130, 21 about 205.
+export const MAZE_COLS = 17;
+export const MAZE_ROWS = 17;
 export const BRAID = 0.6;         // share of dead ends knocked open into loops (0 = perfect maze)
 
 export const RAT_RADIUS = 0.3;
