@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rat's Maze</title>
+  </head>
+  <body>
+    <div id="game"></div>
+
+    <div id="hud" hidden>
+      <div id="crosshair"></div>
+    </div>
+    <div id="debug"></div>
+
+    <div id="overlay">
+      <div class="panel">
+        <h1>Rat's Maze</h1>
+        <p id="overlay-status">Prototype · step 1: walk the maze</p>
+        <button id="play-button" type="button">Enter the maze</button>
+        <dl class="controls">
+          <dt>Mouse</dt><dd>Look</dd>
+          <dt>W A S D</dt><dd>Move</dd>
+          <dt>Esc</dt><dd>Pause</dd>
+          <dt>P</dt><dd>Retro look: off / medium / heavy</dd>
+          <dt>N</dt><dd>New maze</dd>
+        </dl>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

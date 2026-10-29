@@ -1,0 +1,126 @@
+:root {
+  --ink: #0a0806;
+  --cheese: #f2c94c;
+  --parchment: #ebdcaa;
+  --muted: #9a8c6a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--parchment);
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+
+#game canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Lower render resolution is stretched with sharp pixels, not blurred. */
+#game canvas.pixelated {
+  image-rendering: pixelated;
+}
+
+#crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--parchment);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+#debug {
+  position: fixed;
+  left: 12px;
+  bottom: 10px;
+  font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--muted);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at center, rgba(10, 8, 6, 0.55), rgba(10, 8, 6, 0.92));
+}
+
+#overlay[hidden] {
+  display: none;
+}
+
+.panel {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.panel h1 {
+  margin: 0 0 4px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(40px, 9vw, 64px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cheese);
+  text-shadow: 0 3px 0 #5a3d0c, 0 0 30px rgba(242, 201, 76, 0.25);
+}
+
+#overlay-status {
+  margin: 0 0 28px;
+  color: var(--muted);
+}
+
+#play-button {
+  font: inherit;
+  font-size: 18px;
+  font-weight: bold;
+  padding: 14px 32px;
+  border: 2px solid var(--cheese);
+  border-radius: 6px;
+  background: rgba(242, 201, 76, 0.12);
+  color: var(--cheese);
+  cursor: pointer;
+}
+
+#play-button:hover {
+  background: rgba(242, 201, 76, 0.25);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 32px auto 0;
+  max-width: 300px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.controls dt {
+  font-weight: bold;
+  color: var(--parchment);
+  text-align: right;
+}
+
+.controls dd {
+  margin: 0;
+  color: var(--muted);
+}
