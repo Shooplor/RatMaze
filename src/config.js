@@ -16,6 +16,7 @@ export const TICK_RATE = 60;      // simulation steps per second
 
 export const FOV = 65;            // vertical degrees; narrower feels more closed in
 export const MOUSE_SENSITIVITY = 0.0022;
+export const STRAFE_TILT = 2.5;   // degrees the view leans when moving sideways (A / D)
 
 export const FOG_COLOR = 0x070605;
 export const FOG_NEAR = 1;

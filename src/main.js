@@ -126,7 +126,7 @@ function frame(now) {
     }
   }
 
-  view.update(player, accumulator / TICK, controller.yaw, controller.pitch);
+  view.update(player, accumulator / TICK, controller.getCommand(), dt);
   world.update(now / 1000);
   renderer.render(scene, camera);
   updateDebug(dt);
