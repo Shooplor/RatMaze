@@ -65,7 +65,6 @@ function loadMaze(newSeed) {
     speed: RAT_SPEED,
   });
   controller.setView(player.yaw, 0);
-  view.reset();
   camera.position.set(player.x, EYE_HEIGHT, player.z);
   accumulator = 0;
   showSeedInAddress(seed);
@@ -127,7 +126,7 @@ function frame(now) {
     }
   }
 
-  view.update(player, accumulator / TICK, controller.yaw, controller.pitch, dt);
+  view.update(player, accumulator / TICK, controller.yaw, controller.pitch);
   world.update(now / 1000);
   renderer.render(scene, camera);
   updateDebug(dt);

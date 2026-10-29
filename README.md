@@ -54,7 +54,7 @@ src/
     random.js      seeded random numbers
   render/          what you see (three.js)
     world.js       walls, floor, ceiling, lamps
-    firstPersonView.js  camera at the rat's eyes, head-bob, the rat's own light
+    firstPersonView.js  camera at the rat's eyes and the rat's own light
     textures.js    texture loading and the crisp retro filtering
   input/           keyboard and mouse → rat commands
   ui/              HTML/CSS overlay: menus, crosshair, HUD
