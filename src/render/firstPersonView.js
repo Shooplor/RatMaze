@@ -19,6 +19,12 @@ export class FirstPersonView {
     camera.add(this.light);
   }
 
+  /** Call after teleporting, so the jump isn't read as a huge step. */
+  reset() {
+    this.last = null;
+    this.amount = 0;
+  }
+
   /**
    * @param alpha how far we are between the last two simulation ticks (0..1)
    * @param yaw, pitch view angles straight from the mouse, so looking never lags a tick

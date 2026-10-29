@@ -11,6 +11,9 @@ const RIGHT = ['KeyD', 'ArrowRight'];
 /**
  * Turns keyboard and mouse into the rat command the simulation understands.
  * The AI (and later the network) produce the same command, so the Rat can't tell them apart.
+ *
+ * Normally the mouse is captured (pointer lock) like any FPS. Where a page isn't allowed
+ * to capture it, such as some embedded previews, it falls back to drag-to-look.
  */
 export class KeyboardMouseController {
   constructor(element) {
@@ -18,17 +21,21 @@ export class KeyboardMouseController {
     this.keys = new Set();
     this.yaw = 0;
     this.pitch = 0;
-    this.locked = false;
-    this.onLockChange = () => {};
+    this.active = false;      // taking input: mouse captured, or drag-to-look running
+    this.dragToLook = false;
+    this.everLocked = false;
+    this.onActiveChange = () => {};
 
     document.addEventListener('keydown', (e) => {
-      if (this.locked) this.keys.add(e.code);
+      // With a captured mouse the browser handles Esc itself and releases it.
+      if (e.code === 'Escape' && this.dragToLook) this.setActive(false);
+      else if (this.active) this.keys.add(e.code);
     });
     document.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
 
     document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.active || (this.dragToLook && e.buttons === 0)) return;
       // Some browsers report a huge jump right after locking; skip those.
       if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) return;
       this.yaw -= e.movementX * MOUSE_SENSITIVITY;
@@ -37,24 +44,42 @@ export class KeyboardMouseController {
     });
 
     document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === this.element;
-      if (!this.locked) this.keys.clear();
-      this.onLockChange(this.locked);
+      const locked = document.pointerLockElement === this.element;
+      if (locked) this.everLocked = true;
+      if (locked || !this.dragToLook) this.setActive(locked);
     });
   }
 
-  /** Captures the mouse. Browsers only allow this right after a click. */
+  /** Starts taking input. Browsers only allow capturing the mouse right after a click. */
   async requestLock() {
+    if (this.dragToLook) {
+      this.setActive(true);
+      return;
+    }
     try {
       // Raw mouse movement, without the operating system's pointer acceleration.
-      await this.element.requestPointerLock({ unadjustedMovement: true });
+      await this.element.requestPointerLock?.({ unadjustedMovement: true });
     } catch {
       try {
         await this.element.requestPointerLock();
       } catch {
-        // Browsers refuse a re-lock for about a second after Esc; the next click works.
+        // Handled below. After Esc, browsers also refuse a re-lock for about a second.
       }
     }
+    // Never managed to capture the mouse here: look by dragging instead.
+    setTimeout(() => {
+      if (!this.everLocked && !this.active) {
+        this.dragToLook = true;
+        this.setActive(true);
+      }
+    }, 400);
+  }
+
+  setActive(active) {
+    if (this.active === active) return;
+    this.active = active;
+    if (!active) this.keys.clear();
+    this.onActiveChange(active);
   }
 
   setView(yaw, pitch = 0) {

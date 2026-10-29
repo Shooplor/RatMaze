@@ -6,20 +6,30 @@ const LAMP_COLOR = 0xffb468;
 const LAMP_INTENSITY = 7;
 const LAMP_RANGE = TILE * 2.3; // short, so light doesn't seep into the next corridor
 
-/** Builds the visible maze: walls, floor, ceiling and hanging lamps. */
-export function buildWorld(maze, scene) {
-  scene.add(buildWalls(maze));
-  scene.add(buildFloor(maze));
-  scene.add(buildCeiling(maze));
+/** Builds the visible maze: walls, floor, ceiling and hanging lamps, all in one group. */
+export function buildWorld(maze) {
+  const group = new THREE.Group();
+  group.add(buildWalls(maze));
+  group.add(buildFloor(maze));
+  group.add(buildCeiling(maze));
   const lamps = maze.lamps.map(({ cx, cz }, i) => buildLamp(maze, cx, cz, i));
-  lamps.forEach((lamp) => scene.add(lamp.group));
+  lamps.forEach((lamp) => group.add(lamp.group));
 
   // Faint fill light so unlit corridors are dark, not pitch black.
-  scene.add(new THREE.HemisphereLight(0x8c8296, 0x2a2018, 0.35));
+  group.add(new THREE.HemisphereLight(0x8c8296, 0x2a2018, 0.35));
 
   return {
+    group,
     update(time) {
       lamps.forEach((lamp) => lamp.update(time));
+    },
+    /** Frees GPU memory when switching mazes. Textures are shared, so they stay. */
+    dispose() {
+      group.traverse((object) => {
+        object.geometry?.dispose();
+        object.material?.dispose();
+        object.dispose?.(); // instanced meshes and lights
+      });
     },
   };
 }
@@ -47,27 +57,28 @@ function buildWalls(maze) {
 
 // Floor and ceiling are single planes; the texture repeats once per tile.
 function buildFloor(maze) {
-  const width = maze.cols * TILE;
-  const depth = maze.rows * TILE;
-  const material = new THREE.MeshLambertMaterial({
-    map: loadTexture('floor.png', { repeatX: maze.cols, repeatY: maze.rows }),
-  });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), material);
+  const material = new THREE.MeshLambertMaterial({ map: loadTexture('floor.png') });
+  const floor = new THREE.Mesh(tiledPlane(maze), material);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(width / 2, 0, depth / 2);
+  floor.position.set((maze.cols * TILE) / 2, 0, (maze.rows * TILE) / 2);
   return floor;
 }
 
 function buildCeiling(maze) {
-  const width = maze.cols * TILE;
-  const depth = maze.rows * TILE;
-  const material = new THREE.MeshLambertMaterial({
-    map: loadTexture('ceiling.png', { repeatX: maze.cols, repeatY: maze.rows }),
-  });
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), material);
+  const material = new THREE.MeshLambertMaterial({ map: loadTexture('ceiling.png') });
+  const ceiling = new THREE.Mesh(tiledPlane(maze), material);
   ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(width / 2, WALL_HEIGHT, depth / 2);
+  ceiling.position.set((maze.cols * TILE) / 2, WALL_HEIGHT, (maze.rows * TILE) / 2);
   return ceiling;
+}
+
+// A plane covering the whole maze whose UVs run 0..cols and 0..rows, so a shared
+// texture repeats once per tile without each surface needing its own texture copy.
+function tiledPlane(maze) {
+  const geometry = new THREE.PlaneGeometry(maze.cols * TILE, maze.rows * TILE);
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * maze.cols, uv.getY(i) * maze.rows);
+  return geometry;
 }
 
 // A bare bulb hanging on a cord, with a slight flicker.

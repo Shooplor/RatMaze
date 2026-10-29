@@ -1,4 +1,4 @@
-"""Generates the placeholder textures in public/textures/.
+"""Generates the placeholder textures in src/assets/textures/.
 
 Each placeholder shows its file name and size, so it's clear which drawing replaces it.
 Save a drawing over the file (same name, same size) and it shows up in the game.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-OUT = Path(__file__).resolve().parent.parent / "public" / "textures"
+OUT = Path(__file__).resolve().parent.parent / "src" / "assets" / "textures"
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 

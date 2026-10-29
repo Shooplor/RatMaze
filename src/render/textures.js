@@ -1,34 +1,38 @@
 import * as THREE from 'three';
 
-// Every texture is a file in public/textures/. Replacing a file with a drawing of the
+// Every texture is a PNG in src/assets/textures/. Replacing a file with a drawing of the
 // same name is all it takes to put new art in the game.
+const files = import.meta.glob('../assets/textures/*.png', { eager: true, import: 'default' });
 
 const loader = new THREE.TextureLoader();
-const loaded = [];
+const cache = new Map();
 let crisp = false;
 let anisotropy = 1;
 
-export function loadTexture(name, { repeatX = 1, repeatY = 1 } = {}) {
-  const url = `${import.meta.env.BASE_URL}textures/${name}`;
-  const texture = loader.load(url, undefined, undefined, () => console.warn(`Missing texture: ${url}`));
+/** One shared texture per file; surfaces that repeat it scale their own UVs. */
+export function loadTexture(name) {
+  if (cache.has(name)) return cache.get(name);
+
+  const url = files[`../assets/textures/${name}`];
+  if (!url) console.warn(`Missing texture: src/assets/textures/${name}`);
+  const texture = url ? loader.load(url) : new THREE.Texture();
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(repeatX, repeatY);
   applyFiltering(texture);
-  loaded.push(texture);
+  cache.set(name, texture);
   return texture;
 }
 
 export function setMaxAnisotropy(value) {
   anisotropy = value;
-  loaded.forEach(applyFiltering);
+  cache.forEach(applyFiltering);
 }
 
 /** Crisp = hard-edged texture pixels up close, the retro look. Off = smooth. */
 export function setCrispTextures(on) {
   crisp = on;
-  loaded.forEach(applyFiltering);
+  cache.forEach(applyFiltering);
 }
 
 function applyFiltering(texture) {

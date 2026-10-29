@@ -1,6 +1,6 @@
 # Art slots
 
-Every texture in the game is a PNG in `public/textures/`. Right now each one is a
+Every texture in the game is a PNG in `src/assets/textures/`. Right now each one is a
 placeholder that shows its own file name and size.
 
 **To put your drawing in the game:** export it from Procreate as PNG at the size listed,

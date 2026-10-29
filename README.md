@@ -19,6 +19,7 @@ Other commands:
 ```sh
 npm test         # checks the game logic (maze generation, movement, collisions)
 npm run build    # makes a static copy of the game in dist/ for hosting
+npm run build:artifact   # packs the whole game into one file: dist-artifact/rats-maze.html
 ```
 
 ## Controls
@@ -31,8 +32,11 @@ npm run build    # makes a static copy of the game in dist/ for hosting
 | P | Retro look: off / medium / heavy |
 | N | New maze |
 
-Every maze comes from a number (its seed), shown bottom-left and in the address bar
-(`?seed=1234`). The same seed always builds the same maze, so you can share one.
+Every maze comes from a number (its seed), shown bottom-left and at the end of the
+address (`#maze-1234`). The same seed always builds the same maze, so you can share one.
+
+If the browser won't capture the mouse (some embedded previews), the game switches to
+drag-to-look: hold a mouse button and drag.
 
 ## Art
 
@@ -54,7 +58,7 @@ src/
     textures.js    texture loading and the crisp retro filtering
   input/           keyboard and mouse → rat commands
   ui/              HTML/CSS overlay: menus, crosshair, HUD
-public/textures/   the texture files
-tools/             helper scripts (placeholder texture generator)
+src/assets/textures/   the texture files
+tools/             helper scripts (placeholder textures, single-file build)
 tests/             logic tests
 ```

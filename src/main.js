@@ -19,11 +19,6 @@ const RETRO_LEVELS = [
   { name: 'heavy', scale: 1 / 3, crisp: true },
 ];
 
-// --- Level -----------------------------------------------------------------
-
-const seed = readSeed();
-const maze = Maze.generate({ cols: MAZE_COLS, rows: MAZE_ROWS, seed, braid: BRAID, tileSize: TILE });
-
 // --- Renderer, scene, camera -----------------------------------------------
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -37,32 +32,53 @@ scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
 const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, FOG_FAR + TILE);
 scene.add(camera); // the camera carries the rat's own light, so it must be in the scene
 
-const world = buildWorld(maze, scene);
-
-// --- Player ----------------------------------------------------------------
-
-const spawn = maze.spawns.player;
-const spawnPos = maze.cellCenter(spawn.cx, spawn.cz);
-const facing = maze.openDirection(spawn.cx, spawn.cz);
-const player = new Rat({
-  x: spawnPos.x,
-  z: spawnPos.z,
-  yaw: yawFor(facing.dx, facing.dz),
-  radius: RAT_RADIUS,
-  speed: RAT_SPEED,
-});
-
 const controller = new KeyboardMouseController(renderer.domElement);
-controller.setView(player.yaw, 0);
 const view = new FirstPersonView(camera);
-camera.position.set(player.x, EYE_HEIGHT, player.z);
+
+// --- Level -----------------------------------------------------------------
+// The current maze and everything built from it. N swaps in a new one without a reload.
+
+let seed;
+let maze;
+let world;
+let player;
+
+function loadMaze(newSeed) {
+  if (world) {
+    scene.remove(world.group);
+    world.dispose();
+  }
+
+  seed = newSeed;
+  maze = Maze.generate({ cols: MAZE_COLS, rows: MAZE_ROWS, seed, braid: BRAID, tileSize: TILE });
+  world = buildWorld(maze);
+  scene.add(world.group);
+
+  const spawn = maze.spawns.player;
+  const spawnPos = maze.cellCenter(spawn.cx, spawn.cz);
+  const facing = maze.openDirection(spawn.cx, spawn.cz);
+  player = new Rat({
+    x: spawnPos.x,
+    z: spawnPos.z,
+    yaw: yawFor(facing.dx, facing.dz),
+    radius: RAT_RADIUS,
+    speed: RAT_SPEED,
+  });
+  controller.setView(player.yaw, 0);
+  view.reset();
+  camera.position.set(player.x, EYE_HEIGHT, player.z);
+  accumulator = 0;
+  showSeedInAddress(seed);
+
+  if (import.meta.env.DEV) window.ratMaze = { maze, player, controller, camera, scene };
+}
 
 // --- UI and settings -------------------------------------------------------
 
 const hud = createHud({ onPlay: () => controller.requestLock() });
-controller.onLockChange = (locked) => hud.setPlaying(locked);
+controller.onActiveChange = (active) => hud.setPlaying(active, { dragToLook: controller.dragToLook });
 renderer.domElement.addEventListener('click', () => {
-  if (!controller.locked) controller.requestLock();
+  if (!controller.active) controller.requestLock();
 });
 
 const savedRetro = Number(readSetting('retro', 1));
@@ -75,14 +91,18 @@ document.addEventListener('keydown', (e) => {
     writeSetting('retro', retroIndex);
     applyRetro();
   } else if (e.code === 'KeyN') {
-    window.location.search = `?seed=${randomSeed()}`;
+    loadMaze(randomSeed());
   }
+});
+
+// Pasting a link to a different maze switches to it.
+window.addEventListener('hashchange', () => {
+  const linked = seedFromAddress();
+  if (linked !== null && linked !== seed) loadMaze(linked);
 });
 
 window.addEventListener('resize', resize);
 resize();
-
-if (import.meta.env.DEV) window.ratMaze = { maze, player, controller, camera, scene };
 
 // --- Game loop -------------------------------------------------------------
 // The simulation steps at a fixed rate (steady and repeatable, which multiplayer needs).
@@ -93,11 +113,13 @@ let accumulator = 0;
 let lastTime = performance.now();
 let fps = { frames: 0, time: 0, value: 0 };
 
+loadMaze(seedFromAddress() ?? randomSeed());
+
 function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.25);
   lastTime = now;
 
-  if (controller.locked) {
+  if (controller.active) {
     accumulator += dt;
     while (accumulator >= TICK) {
       player.applyCommand(controller.getCommand(), TICK, maze);
@@ -139,15 +161,19 @@ function updateDebug(dt) {
   hud.setDebug(`maze #${seed} · retro: ${RETRO_LEVELS[retroIndex].name} · ${fps.value} fps`);
 }
 
-// The seed lives in the URL, so reloading keeps the same maze and a maze can be shared.
-function readSeed() {
-  const params = new URLSearchParams(window.location.search);
-  const fromUrl = Number.parseInt(params.get('seed'), 10);
-  if (Number.isFinite(fromUrl)) return fromUrl;
-  const fresh = randomSeed();
-  params.set('seed', fresh);
-  window.history.replaceState(null, '', `?${params}`);
-  return fresh;
+// The maze's seed lives in the address (#maze-1234), so reloading keeps the same maze
+// and a link can be shared.
+function seedFromAddress() {
+  const match = /^#maze-(\d+)$/.exec(window.location.hash);
+  return match ? Number(match[1]) : null;
+}
+
+function showSeedInAddress(value) {
+  try {
+    window.history.replaceState(null, '', `#maze-${value}`);
+  } catch {
+    // Some embedded views don't allow changing the address; the maze still works.
+  }
 }
 
 // Settings are a convenience; private browsing can block storage, so never rely on it.
