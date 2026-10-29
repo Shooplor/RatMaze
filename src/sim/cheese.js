@@ -1,55 +1,31 @@
 /**
- * The cheese spread through the maze: one piece on every open tile, Pac-Man style.
+ * The cheese in the maze: one floating piece on every open tile to start, Pac-Man style.
  * Nothing else marks where rats have been: an empty corridor means someone already
- * passed through, floating cheese means nobody has.
+ * cleared it, floating cheese means nobody has.
+ *
+ * A vacuum gun can drag pieces out of place, so each piece keeps its own position.
  */
 export class CheeseField {
-  constructor(maze, { skip = [] } = {}) {
-    this.maze = maze;
-    this.present = new Uint8Array(maze.cols * maze.rows);
-    const skipped = new Set(skip.map(({ cx, cz }) => cz * maze.cols + cx));
-    for (const { cx, cz } of maze.openCells()) {
-      const i = cz * maze.cols + cx;
-      if (!skipped.has(i)) this.present[i] = 1;
-    }
-    this.total = this.present.reduce((sum, v) => sum + v, 0);
+  constructor(maze, { skip = [], height = 0 } = {}) {
+    const skipped = new Set(skip.map(({ cx, cz }) => `${cx},${cz}`));
+    this.pieces = maze
+      .openCells()
+      .filter(({ cx, cz }) => !skipped.has(`${cx},${cz}`))
+      .map(({ cx, cz }, id) => ({ id, ...maze.cellCenter(cx, cz), y: height, taken: false, pulled: false }));
+    this.total = this.pieces.length;
     this.remaining = this.total;
   }
 
-  has(cx, cz) {
-    return this.maze.inBounds(cx, cz) && this.present[cz * this.maze.cols + cx] === 1;
-  }
-
-  /** Takes every piece whose tile centre is within `reach` of (x, z). Returns the tiles taken. */
-  collectNear(x, z, reach) {
-    const t = this.maze.tileSize;
-    const taken = [];
-    for (let cz = Math.floor((z - reach) / t); cz <= Math.floor((z + reach) / t); cz++) {
-      for (let cx = Math.floor((x - reach) / t); cx <= Math.floor((x + reach) / t); cx++) {
-        if (!this.has(cx, cz)) continue;
-        const centre = this.maze.cellCenter(cx, cz);
-        if (Math.hypot(centre.x - x, centre.z - z) <= reach) taken.push(this.take(cx, cz));
-      }
-    }
-    return taken;
+  take(piece) {
+    piece.taken = true;
+    piece.pulled = false;
+    this.remaining--;
   }
 
   /** Takes every piece left. */
   takeAll() {
-    return this.remainingTiles().map(({ cx, cz }) => this.take(cx, cz));
-  }
-
-  remainingTiles() {
-    const tiles = [];
-    for (let i = 0; i < this.present.length; i++) {
-      if (this.present[i]) tiles.push({ cx: i % this.maze.cols, cz: Math.floor(i / this.maze.cols) });
-    }
-    return tiles;
-  }
-
-  take(cx, cz) {
-    this.present[cz * this.maze.cols + cx] = 0;
-    this.remaining--;
-    return { cx, cz };
+    const left = this.pieces.filter((piece) => !piece.taken);
+    left.forEach((piece) => this.take(piece));
+    return left;
   }
 }

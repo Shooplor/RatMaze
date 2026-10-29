@@ -7,18 +7,22 @@ const FORWARD = ['KeyW', 'ArrowUp'];
 const BACK = ['KeyS', 'ArrowDown'];
 const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
+const SUCK = ['KeyE'];  // keyboard alternatives to the mouse buttons
+const FIRE = ['KeyF'];
 
 /**
  * Turns keyboard and mouse into the rat command the simulation understands.
  * The AI (and later the network) produce the same command, so the Rat can't tell them apart.
  *
- * Normally the mouse is captured (pointer lock) like any FPS. Where a page isn't allowed
- * to capture it, such as some embedded previews, it falls back to drag-to-look.
+ * Normally the mouse is captured (pointer lock) like any FPS: left button shoots, right
+ * button runs the vacuum. Where a page isn't allowed to capture the mouse, such as some
+ * embedded previews, it falls back to drag-to-look, and E and F take over the buttons.
  */
 export class KeyboardMouseController {
   constructor(element) {
     this.element = element;
     this.keys = new Set();
+    this.buttons = new Set(); // mouse buttons held: 0 left, 2 right
     this.yaw = 0;
     this.pitch = 0;
     this.active = false;      // taking input: mouse captured, or drag-to-look running
@@ -32,7 +36,19 @@ export class KeyboardMouseController {
       else if (this.active) this.keys.add(e.code);
     });
     document.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => {
+      this.keys.clear();
+      this.buttons.clear();
+    });
+
+    // In drag-to-look the buttons are for looking, so they don't shoot or suck.
+    document.addEventListener('mousedown', (e) => {
+      if (this.active && !this.dragToLook) this.buttons.add(e.button);
+    });
+    document.addEventListener('mouseup', (e) => this.buttons.delete(e.button));
+    document.addEventListener('contextmenu', (e) => {
+      if (this.active) e.preventDefault(); // right button is the vacuum, not a menu
+    });
 
     document.addEventListener('mousemove', (e) => {
       if (!this.active || (this.dragToLook && e.buttons === 0)) return;
@@ -84,7 +100,10 @@ export class KeyboardMouseController {
   setActive(active) {
     if (this.active === active) return;
     this.active = active;
-    if (!active) this.keys.clear();
+    if (!active) {
+      this.keys.clear();
+      this.buttons.clear();
+    }
     this.onActiveChange(active);
   }
 
@@ -100,6 +119,8 @@ export class KeyboardMouseController {
       right: held(RIGHT) - held(LEFT),
       yaw: this.yaw,
       pitch: this.pitch,
+      suck: this.buttons.has(2) || held(SUCK) === 1,
+      fire: this.buttons.has(0) || held(FIRE) === 1,
     };
   }
 }

@@ -3,8 +3,9 @@
 A first-person maze game: gather every piece of cheese, then carry it to the exit
 before the rival rat does. Built with HTML, CSS, JavaScript and [three.js](https://threejs.org).
 
-**Status:** step 2 of the plan: gather every piece of cheese, then follow the cheese
-compass to the exit door. No rival rat yet.
+**Status:** Gunny's scrap vacuum gun sucks up cheese (right mouse) and shoots it back
+out (left mouse). Gather every piece, then follow the cheese compass to the exit door.
+No rival rat yet.
 
 ## Run it
 
@@ -29,6 +30,9 @@ npm run build:artifact   # packs the whole game into one file: dist-artifact/rat
 |---|---|
 | Mouse | Look |
 | W A S D / arrows | Move |
+| Right mouse (hold) | Vacuum: pull cheese into the gun. You walk at half speed |
+| Left mouse | Shoot a piece of cheese (costs 1) |
+| E / F | Vacuum / shoot from the keyboard |
 | Esc | Pause |
 | P | Retro look: off / medium / heavy |
 | N | New maze |
@@ -53,14 +57,17 @@ src/
     maze.js        maze generation (and hand-drawn ASCII layouts)
     rat.js         a rat: moves from a command, the same for player, bot and network
     cheese.js      which tiles still hold cheese
-    match.js       the round's rules: collecting, exit opening, escaping
+    match.js       the round's rules: vacuum, shots, exit opening, escaping
     collision.js   sliding along walls
     random.js      seeded random numbers
   render/          what you see (three.js)
     world.js       walls, floor, ceiling, lamps
     cheeseView.js  the floating cheese wedges
     exitView.js    the exit door and the lit alcove behind it
-    overlay.js     a second 3D layer drawn over the maze (compass now, paw later)
+    overlay.js     a second 3D layer drawn over the maze (gun and compass)
+    gunView.js     the first-person scrap gun (placeholder model) and its animation
+    whirlwind.js   the vacuum's swirling wind effect
+    shotsView.js   cheese shots in flight and the crumbs they burst into
     compass.js     the cheese arrow pointing at the exit
     firstPersonView.js  camera at the rat's eyes, the A/D tilt, the rat's own light
     textures.js    texture loading and the crisp retro filtering

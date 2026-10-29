@@ -139,6 +139,17 @@ export class Maze {
     return { x: (cx + 0.5) * this.tileSize, z: (cz + 0.5) * this.tileSize };
   }
 
+  /** True when the straight line between two points (seen from above) crosses no wall. */
+  lineOfSight(x0, z0, x1, z1) {
+    const steps = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / (this.tileSize / 4));
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const { cx, cz } = this.cellAt(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t);
+      if (this.isWall(cx, cz)) return false;
+    }
+    return true;
+  }
+
   /** Steps along corridors from a tile to every other tile (-1 where unreachable). */
   distancesFrom({ cx, cz }) {
     const dist = new Int32Array(this.cols * this.rows).fill(-1);

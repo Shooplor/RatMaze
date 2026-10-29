@@ -25,13 +25,18 @@ so a drawing that looks right on the iPad will look right in the game.
 | `cheese.png` | 512 × 512 | The floating cheese wedges, the cheese wheel behind the exit, and the cheese compass arrow. | Each wedge shows only part of the image, so draw it as cheese surface (holes, texture) that tiles, not as one wedge. |
 | `ui/hud-cheese.png` | 256 × 256 | The cheese icon next to your carried count, bottom right. | Transparent background. Shown at about 48 × 48. |
 
+## Gunny's gun
+
+| File | What |
+|---|---|
+| Gun model | Gunny's scrap vacuum gun in first person. For now it is a placeholder built in code (`src/render/gunView.js`). Send the model as `.glb` if you can (`.fbx` or `.obj` also work, I'll convert it). I'll fit its size and position on screen and find the nozzle, where the whirlwind starts and shots come out. If it has a part that should spin while sucking, or a cheese jar that fills up, tell me which parts. |
+
 ## Coming in later steps
 
 | File | Canvas | What |
 |---|---|---|
 | Gunny | 1024 × 1024 | Gunny as other players see him (painted on the 3D model in Procreate) |
 | Gunny's arms | 1024 × 1024 | First-person paw (painted on the 3D model in Procreate) |
-| Cheese gun | 1024 × 1024 | Gunny's crafted gun (painted on the 3D model in Procreate) |
 | Hero portrait | 1024 × 1536 | Character select card |
 | More HUD icons | 256 × 256 each | Health, cheese gun, and so on |
 

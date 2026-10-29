@@ -10,7 +10,7 @@
 
     <div id="hud" hidden>
       <div id="crosshair"></div>
-      <p id="hint" hidden>Hold a mouse button and drag to look · Esc to pause</p>
+      <p id="hint" hidden>Drag to look · hold E to suck up cheese · F to shoot · Esc to pause</p>
       <div id="objective">
         <span id="maze-cheese"></span>
         <span id="objective-label">cheese left in the maze</span>
@@ -26,12 +26,15 @@
     <div id="overlay">
       <div class="panel">
         <h1 id="overlay-title">Rat's Maze</h1>
-        <p id="overlay-status">Prototype · step 2: gather the cheese</p>
+        <p id="overlay-status">Prototype · vacuum up the cheese, find the exit</p>
         <button id="play-button" type="button">Enter the maze</button>
         <p id="touch-note" hidden>Rat's Maze needs a keyboard and mouse.</p>
         <dl class="controls">
           <dt>Mouse</dt><dd>Look</dd>
           <dt>W A S D</dt><dd>Move</dd>
+          <dt>Right mouse</dt><dd>Hold to suck up cheese (you walk at half speed)</dd>
+          <dt>Left mouse</dt><dd>Shoot cheese (1 per shot)</dd>
+          <dt>E / F</dt><dd>Suck / shoot from the keyboard</dd>
           <dt>Esc</dt><dd>Pause</dd>
           <dt>P</dt><dd>Retro look: off / medium / heavy</dd>
           <dt>N</dt><dd>New maze</dd>

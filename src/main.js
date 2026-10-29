@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  BRAID, CHEESE_REACH, EYE_HEIGHT, FOG_COLOR, FOG_FAR, FOG_NEAR, FOV, MAZE_COLS, MAZE_ROWS,
-  RAT_RADIUS, RAT_SPEED, TICK_RATE, TILE,
+  BRAID, EYE_HEIGHT, FOG_COLOR, FOG_FAR, FOG_NEAR, FOV, MAZE_COLS, MAZE_ROWS,
+  RAT_RADIUS, RAT_SPEED, RULES, TICK_RATE, TILE,
 } from './config.js';
 import { Maze } from './sim/maze.js';
 import { Match } from './sim/match.js';
@@ -12,6 +12,9 @@ import { buildCheese } from './render/cheeseView.js';
 import { buildExit } from './render/exitView.js';
 import { createOverlay } from './render/overlay.js';
 import { createCompass } from './render/compass.js';
+import { createGun } from './render/gunView.js';
+import { createWhirlwind } from './render/whirlwind.js';
+import { createShots } from './render/shotsView.js';
 import { FirstPersonView } from './render/firstPersonView.js';
 import { setCrispTextures, setMaxAnisotropy } from './render/textures.js';
 import { KeyboardMouseController } from './input/keyboardMouse.js';
@@ -40,6 +43,9 @@ scene.add(camera); // the camera carries the rat's own light, so it must be in t
 
 const overlay = createOverlay();
 const compass = createCompass(overlay);
+const gun = createGun(overlay);
+const whirlwind = createWhirlwind(camera);
+const shotsView = createShots(scene);
 
 const controller = new KeyboardMouseController(renderer.domElement);
 const view = new FirstPersonView(camera);
@@ -74,13 +80,15 @@ function loadMaze(newSeed) {
     yaw: yawFor(facing.dx, facing.dz),
     radius: RAT_RADIUS,
     speed: RAT_SPEED,
+    suckSpeedFactor: RULES.suckSpeedFactor,
   });
   controller.setView(player.yaw, 0);
   camera.position.set(player.x, EYE_HEIGHT, player.z);
-  match = new Match(maze, [player], { reach: CHEESE_REACH });
+  match = new Match(maze, [player], RULES);
 
   world = buildWorld(maze);
-  cheeseView = buildCheese(maze, match.cheese.remainingTiles());
+  cheeseView = buildCheese(match.cheese.pieces);
+  shotsView.clear();
   exitView = buildExit(maze);
   for (const v of [world, cheeseView, exitView]) scene.add(v.group);
   compass.hide();
@@ -101,9 +109,20 @@ function loadMaze(newSeed) {
 function handleEvent(event) {
   switch (event.type) {
     case 'collected':
-      cheeseView.collect(event.tiles);
       hud.setMazeCheese(match.cheese.remaining);
       if (event.rat === player) hud.setCarried(player.carried, { bump: true });
+      break;
+    case 'fired':
+      if (event.rat === player) {
+        gun.kick();
+        hud.setCarried(player.carried);
+      }
+      break;
+    case 'dryFire':
+      if (event.rat === player) hud.flashEmpty();
+      break;
+    case 'shotHit':
+      shotsView.splat(event.x, event.y, event.z);
       break;
     case 'exitOpened':
       exitView.open();
@@ -188,10 +207,20 @@ function frame(now) {
   match.drainEvents().forEach(handleEvent);
 
   const time = now / 1000;
+  const alpha = accumulator / TICK;
   const cmd = controller.getCommand();
-  view.update(player, accumulator / TICK, cmd, dt);
+  const playing = controller.active && match.state !== 'over';
+  view.update(player, alpha, cmd, dt);
   for (const v of [world, cheeseView, exitView]) v.update(time, dt);
   compass.update(dt, camera.position, cmd.yaw, exitView.position);
+  shotsView.sync(match.shots, alpha, time);
+  shotsView.update(dt);
+  gun.update(dt, time, {
+    moving: playing && (cmd.forward !== 0 || cmd.right !== 0),
+    sucking: playing && cmd.suck,
+    carried: player.carried,
+  });
+  whirlwind.update(dt, time, playing && cmd.suck, gun.muzzle);
 
   renderer.clear();
   renderer.render(scene, camera);

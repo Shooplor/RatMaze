@@ -121,6 +121,21 @@ body {
   animation: bump 0.25s ease-out;
 }
 
+/* Trying to shoot with an empty jar. */
+#carried.empty #carried-count {
+  animation: empty 0.35s ease-out;
+}
+
+@keyframes empty {
+  30% {
+    color: #e0533a;
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(4px);
+  }
+}
+
 @keyframes bump {
   40% {
     transform: scale(1.18);
@@ -144,7 +159,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #carried.bump {
+  #carried.bump,
+  #carried.empty #carried-count {
     animation: none;
   }
 }
@@ -220,7 +236,7 @@ body {
   grid-template-columns: auto 1fr;
   gap: 6px 16px;
   margin: 32px auto 0;
-  max-width: 300px;
+  max-width: 400px;
   text-align: left;
   font-size: 14px;
 }

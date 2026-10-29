@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { CHEESE_HEIGHT } from '../config.js';
 import { loadTexture } from './textures.js';
 
-const BOB = 0.06;          // how far each piece floats up and down
-const SPIN = 1.1;          // turns per second, in radians
-const VANISH_TIME = 0.18;  // seconds a collected piece takes to shrink away
+const BOB = 0.06;          // how far each resting piece floats up and down
+const SPIN = 1.1;          // radians per second while resting
+const PULLED_SPIN = 12;    // radians per second while being sucked in
+const FOLLOW = 25;         // how tightly the visible piece follows the simulated one
+const VANISH_TIME = 0.12;  // seconds a collected piece takes to shrink away
 
 /** A cheese wedge: a slice of a wheel, rind on the curved side. */
 export function cheeseWedgeGeometry(radius = 0.32, thickness = 0.18, angle = Math.PI * 0.3) {
@@ -16,8 +17,8 @@ export function cheeseWedgeGeometry(radius = 0.32, thickness = 0.18, angle = Mat
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: thickness,
     bevelEnabled: true,
-    bevelThickness: 0.015,
-    bevelSize: 0.015,
+    bevelThickness: thickness * 0.08,
+    bevelSize: radius * 0.05,
     bevelSegments: 1,
     curveSegments: 8,
   });
@@ -37,55 +38,63 @@ export function cheeseMaterial() {
   });
 }
 
-/** Every floating piece of cheese in one instanced mesh. */
-export function buildCheese(maze, tiles) {
-  const mesh = new THREE.InstancedMesh(cheeseWedgeGeometry(), cheeseMaterial(), tiles.length);
+/**
+ * Every piece of cheese in one instanced mesh. Resting pieces bob and turn slowly;
+ * pieces caught by a vacuum follow the simulation toward the gun, spinning and wobbling.
+ */
+export function buildCheese(pieces) {
+  const mesh = new THREE.InstancedMesh(cheeseWedgeGeometry(), cheeseMaterial(), pieces.length);
   mesh.frustumCulled = false; // instances move every frame; culling would need constant recalculation
 
-  const pieces = tiles.map(({ cx, cz }) => ({
-    ...maze.cellCenter(cx, cz),
-    phase: (cx * 7.31 + cz * 3.17) % (Math.PI * 2), // so they don't all bob in step
+  const looks = pieces.map((p) => ({
+    x: p.x,
+    y: p.y,
+    z: p.z,
+    phase: (p.x * 7.31 + p.z * 3.17) % (Math.PI * 2), // so they don't all bob in step
+    angle: 0,
+    bob: 1,
     vanishing: -1, // seconds since collected, -1 while still there
     gone: false,
   }));
-  const byTile = new Map(tiles.map(({ cx, cz }, i) => [`${cx},${cz}`, i]));
 
   const position = new THREE.Vector3();
   const rotation = new THREE.Quaternion();
+  const euler = new THREE.Euler();
   const scale = new THREE.Vector3();
-  const up = new THREE.Vector3(0, 1, 0);
   const matrix = new THREE.Matrix4();
   const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
 
   return {
     group: mesh,
 
-    collect(collected) {
-      for (const { cx, cz } of collected) {
-        const i = byTile.get(`${cx},${cz}`);
-        if (i !== undefined && pieces[i].vanishing < 0) pieces[i].vanishing = 0;
-      }
-    },
-
     update(time, dt) {
+      const follow = 1 - Math.exp(-dt * FOLLOW);
       pieces.forEach((piece, i) => {
-        if (piece.gone) return;
+        const look = looks[i];
+        if (look.gone) return;
+
         let size = 1;
-        let lift = 0;
-        if (piece.vanishing >= 0) {
-          piece.vanishing += dt;
-          const t = Math.min(1, piece.vanishing / VANISH_TIME);
-          size = 1 - t;
-          lift = t * 0.35;
-          if (t >= 1) {
-            piece.gone = true;
+        if (piece.taken) {
+          if (look.vanishing < 0) look.vanishing = 0;
+          look.vanishing += dt;
+          size = 1 - look.vanishing / VANISH_TIME;
+          if (size <= 0) {
+            look.gone = true;
             mesh.setMatrixAt(i, hidden);
             return;
           }
         }
-        position.set(piece.x, CHEESE_HEIGHT + Math.sin(time * 2 + piece.phase) * BOB + lift, piece.z);
-        rotation.setFromAxisAngle(up, time * SPIN + piece.phase);
-        scale.setScalar(size);
+
+        look.x += (piece.x - look.x) * follow;
+        look.y += (piece.y - look.y) * follow;
+        look.z += (piece.z - look.z) * follow;
+        look.bob += ((piece.pulled ? 0 : 1) - look.bob) * Math.min(1, dt * 6);
+        look.angle += dt * (piece.pulled ? PULLED_SPIN : SPIN);
+        const wobble = piece.pulled ? Math.sin(time * 40 + look.phase) * 0.35 : 0;
+
+        position.set(look.x, look.y + Math.sin(time * 2 + look.phase) * BOB * look.bob, look.z);
+        rotation.setFromEuler(euler.set(wobble, look.angle + look.phase, wobble * 0.5));
+        scale.setScalar(size * (piece.pulled ? 0.85 : 1));
         mesh.setMatrixAt(i, matrix.compose(position, rotation, scale));
       });
       mesh.instanceMatrix.needsUpdate = true;

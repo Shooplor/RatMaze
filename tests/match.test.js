@@ -6,83 +6,150 @@ import { Rat, yawFor } from '../src/sim/rat.js';
 
 const T = 2;
 const R = 0.3;
-const REACH = T * 0.45;
+const RULES = {
+  eyeHeight: 1.5,
+  ceilingHeight: 2,
+  cheeseHeight: 0.9,
+  suckRange: 4.5,
+  suckAngle: 30,
+  suckGrabRadius: 1,
+  suckPullMin: 2.5,
+  suckPullMax: 11,
+  suckSpeedFactor: 0.5,
+  collectDistance: 0.45,
+  shotSpeed: 26,
+  shotGravity: 3,
+  shotCooldown: 0.25,
+  shotCost: 1,
+  shotLifetime: 3,
+  muzzle: { right: 0.2, down: 0.2, forward: 0.8 },
+};
+const EAST = yawFor(1, 0);
+const NORTH = yawFor(0, -1);
 
-// A corridor with the exit door in the north wall above its far end.
-const layout = `
+function setup(layout = `
   #####D#
   #P....#
   #######
-`;
-
-function setup() {
+`) {
   const maze = Maze.fromAscii(layout, T);
   const start = maze.cellCenter(maze.spawns.player.cx, maze.spawns.player.cz);
-  const rat = new Rat({ x: start.x, z: start.z, radius: R, speed: 4 });
-  const match = new Match(maze, [rat], { reach: REACH });
+  const rat = new Rat({ x: start.x, z: start.z, radius: R, speed: 4, suckSpeedFactor: RULES.suckSpeedFactor });
+  const match = new Match(maze, [rat], RULES);
   return { maze, rat, match };
 }
 
-function walk(rat, match, maze, dir, seconds) {
-  const yaw = yawFor(dir[0], dir[1]);
+function run(rat, match, maze, cmd, seconds) {
   for (let t = 0; t < seconds; t += 1 / 60) {
-    rat.applyCommand({ forward: 1, right: 0, yaw, pitch: 0 }, 1 / 60, maze);
+    rat.applyCommand({ forward: 0, right: 0, yaw: rat.yaw, pitch: 0, ...cmd }, 1 / 60, maze);
     match.update(1 / 60);
   }
 }
 
+const types = (match) => match.drainEvents().map((e) => e.type);
+
 test('cheese sits on every open tile except where the rat starts', () => {
   const { match } = setup();
   assert.equal(match.cheese.total, 4);
-  assert.equal(match.cheese.has(1, 1), false);
+  assert.ok(match.cheese.pieces.every((p) => p.x !== 1.5 * T));
 });
 
-test('walking down a corridor collects its cheese, each piece once', () => {
+test('walking through cheese without the vacuum takes nothing', () => {
   const { maze, rat, match } = setup();
-  walk(rat, match, maze, [1, 0], 0.7); // about 1.4 tiles east
-  assert.equal(rat.carried, 1);
-  assert.equal(match.cheese.remaining, 3);
-  const events = match.drainEvents();
-  assert.deepEqual(events.map((e) => e.type), ['collected']);
-  assert.deepEqual(events[0].tiles, [{ cx: 2, cz: 1 }]);
+  run(rat, match, maze, { forward: 1, yaw: EAST }, 3);
+  assert.equal(rat.carried, 0);
+  assert.equal(match.cheese.remaining, 4);
 });
 
-test('hugging the wall still collects the cheese', () => {
+test('the vacuum pulls cheese in front of you into the gun', () => {
   const { maze, rat, match } = setup();
-  rat.z = 1 * T + R; // pressed against the north wall
-  walk(rat, match, maze, [1, 0], 3);
-  assert.equal(rat.carried, 4);
+  // Standing still at the west end, aiming east: the next two tiles (2 and 4 units away) are in reach.
+  run(rat, match, maze, { suck: true, yaw: EAST }, 1.5);
+  assert.equal(rat.carried, 2);
+  assert.equal(match.cheese.remaining, 2);
+  assert.deepEqual([...new Set(types(match))], ['collected']);
 });
 
-test('the exit stays shut until the maze is empty, then the first rat through wins', () => {
+test('the vacuum does not pull cheese behind you or through walls', () => {
   const { maze, rat, match } = setup();
-  rat.x = rat.prevX = 5.5 * T; // right under the door (tile 5, 0)
-  match.update(1 / 60);
-  assert.equal(match.cheese.remaining, 3);
+  run(rat, match, maze, { suck: true, yaw: yawFor(-1, 0) }, 2); // aiming west, cheese is east
+  assert.equal(rat.carried, 0);
 
-  walk(rat, match, maze, [0, -1], 1); // push north into the closed door
-  assert.equal(match.state, 'collecting');
+  // Two parallel corridors: cheese on the other side of a wall stays put.
+  const two = setup(`
+    #######
+    #P....#
+    #######
+    #.....#
+    #######
+  `);
+  run(two.rat, two.match, two.maze, { suck: true, yaw: yawFor(0, 1) }, 2); // aiming south at the wall
+  assert.equal(two.rat.carried, 0);
+});
+
+test('a piece pulled part way stays where it was left', () => {
+  const { maze, rat, match } = setup();
+  const far = match.cheese.pieces.find((p) => p.x === 4.5 * T); // 6 units away: out of reach
+  rat.x = rat.prevX = 2.5 * T; // now the 4.5 piece is 4 units away, at the edge of reach
+  run(rat, match, maze, { suck: true, yaw: EAST }, 0.1);
+  const moved = far.x;
+  assert.ok(moved < 4.5 * T, 'it was pulled toward the gun');
+  run(rat, match, maze, { yaw: EAST }, 0.5);
+  assert.equal(far.x, moved, 'and stops when the vacuum stops');
+  assert.equal(far.taken, false);
+});
+
+test('sucking halves walking speed', () => {
+  const a = setup();
+  const b = setup();
+  run(a.rat, a.match, a.maze, { forward: 1, yaw: EAST }, 0.5);
+  run(b.rat, b.match, b.maze, { forward: 1, suck: true, yaw: EAST }, 0.5);
+  const start = 1.5 * T;
+  assert.ok(Math.abs((b.rat.x - start) * 2 - (a.rat.x - start)) < 0.05);
+});
+
+test('shooting costs one cheese per shot, at most four shots a second', () => {
+  const { maze, rat, match } = setup();
+  rat.carried = 10;
+  run(rat, match, maze, { fire: true, yaw: EAST }, 1);
+  assert.equal(rat.carried, 6);
+  assert.equal(types(match).filter((t) => t === 'fired').length, 4);
+});
+
+test('with no cheese the gun only clicks', () => {
+  const { maze, rat, match } = setup();
+  run(rat, match, maze, { fire: true, yaw: EAST }, 0.1);
+  assert.equal(match.shots.length, 0);
+  assert.deepEqual(types(match), ['dryFire']);
+});
+
+test('a shot flies toward the crosshair and splats on the wall', () => {
+  const { maze, rat, match } = setup();
+  rat.carried = 1;
+  run(rat, match, maze, { fire: true, yaw: EAST }, 1 / 60);
+  const [shot] = match.shots;
+  assert.ok(shot.vx > 20, 'heading east');
+  run(rat, match, maze, { yaw: EAST }, 1);
+  assert.equal(match.shots.length, 0);
+  const hit = match.drainEvents().find((e) => e.type === 'shotHit');
+  assert.ok(hit.x > 5.5 * T && hit.x <= 6 * T, `splat near the east wall, at x = ${hit.x}`);
+});
+
+test('the exit opens once the maze is empty, and the first rat through wins', () => {
+  const { maze, rat, match } = setup();
+  rat.x = rat.prevX = 5.5 * T; // under the door
+  run(rat, match, maze, { forward: 1, yaw: NORTH }, 1);
   assert.ok(rat.z >= 1 * T + R - 1e-9, 'the closed door blocks');
 
-  walk(rat, match, maze, [-1, 0], 3); // back west for the rest
-  assert.equal(match.cheese.remaining, 0);
+  match.giveAllCheese(rat);
+  match.update(1 / 60);
   assert.equal(match.state, 'exitOpen');
-  assert.ok(maze.isOpen(5, 0), 'door is open');
+  assert.ok(maze.isOpen(5, 0));
 
-  walk(rat, match, maze, [1, 0], 3); // east to the end again
-  walk(rat, match, maze, [0, -1], 1); // and through the door
+  run(rat, match, maze, { forward: 1, yaw: NORTH }, 1);
   assert.equal(match.state, 'over');
   assert.equal(match.winner, rat);
   assert.equal(rat.delivered, 4);
   assert.equal(rat.carried, 0);
-  const types = match.drainEvents().map((e) => e.type).filter((t) => t !== 'collected');
-  assert.deepEqual(types, ['exitOpened', 'escaped']);
-});
-
-test('the testing shortcut hands over all cheese and opens the exit on the next tick', () => {
-  const { rat, match } = setup();
-  match.giveAllCheese(rat);
-  assert.equal(rat.carried, 4);
-  match.update(1 / 60);
-  assert.equal(match.state, 'exitOpen');
+  assert.deepEqual(types(match).filter((t) => t !== 'collected'), ['exitOpened', 'escaped']);
 });

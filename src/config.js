@@ -14,7 +14,6 @@ export const BRAID = 0.6;         // share of dead ends knocked open into loops 
 export const RAT_RADIUS = 0.3;
 export const RAT_SPEED = 4.2;     // units per second
 
-export const CHEESE_REACH = TILE * 0.45; // how close a rat gets to take a piece (covers the corridor width)
 export const CHEESE_HEIGHT = 0.95;       // how high the cheese floats
 
 export const TICK_RATE = 60;      // simulation steps per second
@@ -26,3 +25,27 @@ export const STRAFE_TILT = 2.5;   // degrees the view leans when moving sideways
 export const FOG_COLOR = 0x070605;
 export const FOG_NEAR = 1;
 export const FOG_FAR = TILE * 6;
+
+// The round's rules: Gunny's vacuum gun and its cheese shots.
+export const RULES = {
+  eyeHeight: EYE_HEIGHT,
+  ceilingHeight: WALL_HEIGHT,
+  cheeseHeight: CHEESE_HEIGHT,
+
+  suckRange: TILE * 2.2,   // how far the vacuum reaches
+  suckAngle: 30,           // degrees either side of where you aim
+  suckGrabRadius: 1.0,     // anything this close gets pulled in, whatever the angle
+  suckPullMin: 2.5,        // pull speed at the edge of the reach (units per second)
+  suckPullMax: 11,         // pull speed right at the nozzle
+  suckSpeedFactor: 0.5,    // walking speed while sucking
+  collectDistance: 0.45,   // a piece this close to the nozzle is in
+
+  shotSpeed: 26,           // units per second
+  shotGravity: 3,          // a slight drop, so shots arc a little
+  shotCooldown: 0.25,      // seconds between shots
+  shotCost: 1,             // cheese per shot
+  shotLifetime: 3,
+
+  // Where the nozzle sits relative to the eye. The gun on screen is placed to match.
+  muzzle: { right: 0.26, down: 0.21, forward: 0.8 },
+};

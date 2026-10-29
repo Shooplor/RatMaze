@@ -30,6 +30,12 @@ export function createHud({ onPlay }) {
   playButton.addEventListener('click', onPlay);
   $('touch-note').hidden = !window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
+  function restartAnimation(element, className) {
+    element.classList.remove(className);
+    void element.offsetWidth; // force a reflow so the animation plays again
+    element.classList.add(className);
+  }
+
   function renderOverlay() {
     if (result) {
       title.textContent = result.title;
@@ -73,11 +79,12 @@ export function createHud({ onPlay }) {
 
     setCarried(count, { bump = false } = {}) {
       carriedCount.textContent = count;
-      if (bump) {
-        carried.classList.remove('bump');
-        void carried.offsetWidth; // restart the animation
-        carried.classList.add('bump');
-      }
+      if (bump) restartAnimation(carried, 'bump');
+    },
+
+    /** Shakes the counter red: tried to shoot with no cheese. */
+    flashEmpty() {
+      restartAnimation(carried, 'empty');
     },
 
     toast(text, seconds = 4) {
