@@ -1,6 +1,6 @@
 import * as sounds from './sounds.js';
 
-const MASTER_VOLUME = 0.8;
+export const DEFAULT_VOLUME = 0.4;
 const MUFFLED_CUTOFF = 650; // Hz: what's left of a sound that comes round a corner
 
 /**
@@ -14,6 +14,11 @@ export function createAudio() {
   let noise = null;
   let vacuum = null;
   let muted = false;
+  let volume = DEFAULT_VOLUME;
+
+  const applyVolume = () => {
+    if (master) master.gain.setTargetAtTime(muted ? 0 : volume, ctx.currentTime, 0.05);
+  };
 
   // Where a sound goes: straight to the speakers (your own sounds), or through a 3D
   // panner at its position, quieter with distance and muffled with no line of sight.
@@ -56,7 +61,7 @@ export function createAudio() {
         if (!AudioContext) return;
         ctx = new AudioContext();
         master = ctx.createGain();
-        master.gain.value = muted ? 0 : MASTER_VOLUME;
+        master.gain.value = muted ? 0 : volume;
         master.connect(ctx.destination);
         noise = sounds.makeNoise(ctx);
         vacuum = sounds.createVacuumVoice(ctx, master, noise);
@@ -70,7 +75,17 @@ export function createAudio() {
 
     setMuted(value) {
       muted = value;
-      if (master) master.gain.setTargetAtTime(muted ? 0 : MASTER_VOLUME, ctx.currentTime, 0.05);
+      applyVolume();
+    },
+
+    get volume() {
+      return volume;
+    },
+
+    /** Overall volume, 0 to 1. */
+    setVolume(value) {
+      volume = Math.round(Math.max(0, Math.min(1, value)) * 10) / 10;
+      applyVolume();
     },
 
     /** Moves the ears to the camera. */

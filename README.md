@@ -38,6 +38,7 @@ npm run build:artifact   # packs the whole game into one file: dist-artifact/rat
 | Ctrl or C | Crouch on / off: silent footsteps, slowest. C is safer, since Ctrl+W closes the browser tab |
 | Esc | Pause |
 | M | Sound on / off |
+| [ / ] | Volume down / up (saved for next time) |
 | P | Retro look: off / medium / heavy |
 | N | New maze |
 | K | Testing shortcut: collect all the cheese at once, to try the exit |

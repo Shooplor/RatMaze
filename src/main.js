@@ -21,7 +21,7 @@ import { FirstPersonView } from './render/firstPersonView.js';
 import { createRatView } from './render/ratView.js';
 import { setCrispTextures, setMaxAnisotropy } from './render/textures.js';
 import { KeyboardMouseController } from './input/keyboardMouse.js';
-import { createAudio } from './audio/audio.js';
+import { createAudio, DEFAULT_VOLUME } from './audio/audio.js';
 import { createHud } from './ui/hud.js';
 
 // Retro look: render at a fraction of the screen resolution and stretch with sharp pixels.
@@ -229,6 +229,8 @@ renderer.domElement.addEventListener('click', () => {
   if (!controller.active) controller.requestLock();
 });
 audio.setMuted(readSetting('muted', 'false') === 'true');
+const savedVolume = Number(readSetting('volume', DEFAULT_VOLUME));
+audio.setVolume(Number.isFinite(savedVolume) ? savedVolume : DEFAULT_VOLUME);
 
 const savedRetro = Number(readSetting('retro', 1));
 let retroIndex = Number.isInteger(savedRetro) ? savedRetro % RETRO_LEVELS.length : 1;
@@ -248,6 +250,10 @@ document.addEventListener('keydown', (e) => {
   } else if (e.code === 'KeyM') {
     audio.setMuted(!audio.muted);
     writeSetting('muted', audio.muted);
+  } else if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+    audio.setVolume(audio.volume + (e.code === 'BracketRight' ? 0.1 : -0.1));
+    writeSetting('volume', audio.volume);
+    hud.toast(`Volume ${Math.round(audio.volume * 100)}%`, 1.2);
   }
 });
 
@@ -352,7 +358,7 @@ function updateDebug(dt) {
     fps.value = Math.round(fps.frames / fps.time);
     fps = { frames: 0, time: 0, value: fps.value };
   }
-  const sound = audio.muted ? 'off' : 'on';
+  const sound = audio.muted ? 'off' : `${Math.round(audio.volume * 100)}%`;
   hud.setDebug(`maze #${seed} · retro: ${RETRO_LEVELS[retroIndex].name} · sound: ${sound} · ${fps.value} fps`);
 }
 
