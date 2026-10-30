@@ -31,7 +31,9 @@ const RETRO_LEVELS = [
   { name: 'heavy', scale: 1 / 3, crisp: true },
 ];
 
-const OWN_STEP_VOLUME = 0.35; // your own footsteps, quieter than others' so theirs stand out
+// How loud your own sounds play for you. The noise meter and other rats' hearing use the
+// real loudness from the rules; these only keep your own sounds from getting tiring.
+const OWN_STEP_VOLUME = 0.18; // well under other rats' steps, so theirs stand out
 const SPLAT_LOUDNESS = 0.8;
 const DOOR_LOUDNESS = 2.5;    // the exit opening can be heard from far off
 
@@ -309,6 +311,7 @@ function frame(now) {
   hud.setStance(
     player.crouching ? 'Crouched' : player.sneaking ? 'Sneaking' : 'Walking',
     Math.max(stepNoise, vacuumNoise),
+    playing && player.crouching,
   );
 
   renderer.clear();

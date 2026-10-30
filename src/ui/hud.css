@@ -43,6 +43,31 @@ body {
   background: var(--parchment);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
   pointer-events: none;
+  transition: width 0.2s, height 0.2s, margin 0.2s, border-radius 0.2s;
+}
+
+/* Crouched: the dot flattens into a short line, a quiet "you're sneaking" cue. */
+#hud.crouched #crosshair {
+  width: 16px;
+  height: 2px;
+  margin: -1px 0 0 -8px;
+  border-radius: 1px;
+}
+
+/* Crouched: the edges of the view darken, strongest at the sides. */
+#vignette {
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(4, 6, 10, 0.78), transparent 24%, transparent 76%, rgba(4, 6, 10, 0.78)),
+    radial-gradient(ellipse 80% 90% at center, transparent 60%, rgba(4, 6, 10, 0.55));
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+#hud.crouched #vignette {
+  opacity: 1;
 }
 
 #hint {
@@ -159,6 +184,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  #crosshair,
+  #vignette {
+    transition: none;
+  }
+
   #carried.bump,
   #carried.empty #carried-count {
     animation: none;

@@ -103,9 +103,10 @@ export function createHud({ onPlay }) {
       toast.hidden = true;
     },
 
-    /** Your stance and how loud you are right now (0 silent to 1 full). */
-    setStance(name, noise) {
+    /** Your stance, how loud you are right now (0 silent to 1 full), and the crouched look. */
+    setStance(name, noise, crouched) {
       stanceLabel.textContent = name;
+      hud.classList.toggle('crouched', crouched);
       const lit = Math.round(Math.min(1, noise) * noiseBars.length);
       noiseBars.forEach((bar, i) => bar.classList.toggle('on', i < lit));
     },

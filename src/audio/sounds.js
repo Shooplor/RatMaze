@@ -131,7 +131,7 @@ export function createVacuumVoice(ctx, out, noise) {
     set(level, when = ctx.currentTime) {
       if (Math.abs(level - last) < 0.01) return;
       last = level;
-      gain.gain.setTargetAtTime(level * 0.45, when, level > 0 ? 0.08 : 0.18);
+      gain.gain.setTargetAtTime(level * 0.25, when, level > 0 ? 0.08 : 0.18);
       motor.frequency.setTargetAtTime(45 + 75 * level, when, 0.25);
       motorFilter.frequency.setTargetAtTime(250 + 1000 * level, when, 0.25);
       airFilter.frequency.setTargetAtTime(400 + 1500 * level, when, 0.25);
