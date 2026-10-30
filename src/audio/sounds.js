@@ -22,13 +22,15 @@ function envelope(ctx, out, when, peak, attack, decay) {
   return gain;
 }
 
-function noiseBurst(ctx, out, when, noise, { type, frequency, q = 1, peak, attack = 0.002, decay, rate = 1 }) {
+// `sweepTo` slides the filter to another frequency over the sound's length.
+function noiseBurst(ctx, out, when, noise, { type, frequency, sweepTo, q = 1, peak, attack = 0.002, decay, rate = 1 }) {
   const source = ctx.createBufferSource();
   source.buffer = noise;
   source.playbackRate.value = rate;
   const filter = ctx.createBiquadFilter();
   filter.type = type;
-  filter.frequency.value = frequency;
+  filter.frequency.setValueAtTime(frequency, when);
+  if (sweepTo) filter.frequency.exponentialRampToValueAtTime(sweepTo, when + attack + decay);
   filter.Q.value = q;
   source.connect(filter).connect(envelope(ctx, out, when, peak, attack, decay));
   source.start(when, Math.random() * 1.5, attack + decay + 0.05);
@@ -51,10 +53,24 @@ export function footstep(ctx, out, when, volume, noise) {
   tone(ctx, out, when, { from: rand(120, 160), to: 55, peak: 0.55 * volume, decay: 0.09 });
 }
 
-/** The gun firing a lump of cheese: a puff of air and a falling pop. */
+/**
+ * The scrap gun firing a lump of cheese, like a compressed-air cannon: a sharp click as
+ * the valve snaps, a blast of air sweeping down in pitch, a punchy thump, and a short
+ * metallic twang from the loose parts. Slightly different every shot.
+ */
 export function shot(ctx, out, when, volume, noise) {
-  noiseBurst(ctx, out, when, noise, { type: 'lowpass', frequency: 1600, peak: 0.7 * volume, decay: 0.12 });
-  tone(ctx, out, when, { from: 240, to: 70, peak: 0.6 * volume, decay: 0.13 });
+  const pitch = rand(0.92, 1.08);
+  // valve click
+  noiseBurst(ctx, out, when, noise, { type: 'highpass', frequency: 3500, peak: 0.55 * volume, attack: 0.001, decay: 0.018 });
+  // air blast: "pfft", bright at first then dropping
+  noiseBurst(ctx, out, when, noise, {
+    type: 'bandpass', frequency: 3200 * pitch, sweepTo: 700 * pitch, q: 0.9, peak: 1.0 * volume, attack: 0.003, decay: 0.16,
+  });
+  // thump
+  tone(ctx, out, when, { from: 190 * pitch, to: 48, peak: 0.85 * volume, attack: 0.002, decay: 0.11 });
+  // twang: two out-of-tune partials, like a sprung metal plate
+  tone(ctx, out, when + 0.004, { type: 'triangle', from: 1180 * pitch, to: 1050 * pitch, peak: 0.12 * volume, decay: 0.09 });
+  tone(ctx, out, when + 0.004, { type: 'triangle', from: 1730 * pitch, to: 1600 * pitch, peak: 0.07 * volume, decay: 0.07 });
 }
 
 /** Cheese hitting a wall: a wet, resonant squish. */
