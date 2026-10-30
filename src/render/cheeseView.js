@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { loadTexture } from './textures.js';
+import { buildCheeseWedge } from '../models/cheeseWedge.js';
 
 const BOB = 0.06;          // how far each resting piece floats up and down
 const SPIN = 1.1;          // radians per second while resting
@@ -7,35 +8,29 @@ const PULLED_SPIN = 12;    // radians per second while being sucked in
 const FOLLOW = 25;         // how tightly the visible piece follows the simulated one
 const VANISH_TIME = 0.12;  // seconds a collected piece takes to shrink away
 
-/** A cheese wedge: a slice of a wheel, rind on the curved side. */
-export function cheeseWedgeGeometry(radius = 0.32, thickness = 0.18, angle = Math.PI * 0.3) {
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.lineTo(radius, 0);
-  shape.absarc(0, 0, radius, 0, angle, false);
-  shape.lineTo(0, 0);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: thickness,
-    bevelEnabled: true,
-    bevelThickness: thickness * 0.08,
-    bevelSize: radius * 0.05,
-    bevelSegments: 1,
-    curveSegments: 8,
-  });
-  geometry.rotateX(-Math.PI / 2); // lie flat, thickness pointing up
-  geometry.center();
+/** A cheese wedge: a slice of a wheel, rind on the curved side, painted with cheese-wedge.png. */
+export function cheeseWedgeGeometry(radius, thickness) {
+  const wedge = buildCheeseWedge({ radius, thickness });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(wedge.positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(wedge.normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(wedge.uvs, 2));
   return geometry;
 }
 
-/** Slightly self-lit, so cheese glints down a dark corridor before the light reaches it. */
+// Slightly self-lit, so cheese glints down a dark corridor before the light reaches it.
+function glowing(map) {
+  return new THREE.MeshLambertMaterial({ map, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.3 });
+}
+
+/** For the collectible wedges and cheese shots: the painted wedge texture. */
+export function cheeseWedgeMaterial() {
+  return glowing(loadTexture('cheese-wedge.png'));
+}
+
+/** For everything else made of cheese (compass arrow, wheel, jar): a tiling cheese surface. */
 export function cheeseMaterial() {
-  const map = loadTexture('cheese.png');
-  return new THREE.MeshLambertMaterial({
-    map,
-    emissive: 0xffffff,
-    emissiveMap: map,
-    emissiveIntensity: 0.3,
-  });
+  return glowing(loadTexture('cheese.png'));
 }
 
 /**
@@ -43,7 +38,7 @@ export function cheeseMaterial() {
  * pieces caught by a vacuum follow the simulation toward the gun, spinning and wobbling.
  */
 export function buildCheese(pieces) {
-  const mesh = new THREE.InstancedMesh(cheeseWedgeGeometry(), cheeseMaterial(), pieces.length);
+  const mesh = new THREE.InstancedMesh(cheeseWedgeGeometry(), cheeseWedgeMaterial(), pieces.length);
   mesh.frustumCulled = false; // instances move every frame; culling would need constant recalculation
 
   const looks = pieces.map((p) => ({

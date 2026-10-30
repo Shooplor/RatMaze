@@ -22,8 +22,29 @@ so a drawing that looks right on the iPad will look right in the game.
 | File | Canvas | Where it appears | Notes |
 |---|---|---|---|
 | `door.png` | 512 × 512 | The exit door, floor to ceiling, one corridor wide. | Drawn as seen from the corridor. |
-| `cheese.png` | 512 × 512 | The floating cheese wedges, the cheese wheel behind the exit, and the cheese compass arrow. | Each wedge shows only part of the image, so draw it as cheese surface (holes, texture) that tiles, not as one wedge. |
+| `cheese.png` | 512 × 512 | The cheese compass arrow, the cheese wheel behind the exit, the cheese in the gun's jar and the crumbs from a splat. | Draw it as cheese surface (holes, texture) that tiles, not as one object. |
 | `ui/hud-cheese.png` | 256 × 256 | The cheese icon next to your carried count, bottom right. | Transparent background. Shown at about 48 × 48. |
+
+## The cheese wedge you collect
+
+| File | Canvas | Where it appears |
+|---|---|---|
+| `cheese-wedge.png` | 1024 × 1024 | The floating cheese you suck up, and the cheese you shoot. |
+
+This one is painted onto the model's layout (its UVs), not tiled: each face of the wedge
+has its own area of the image. Everything you need is in `art/cheese-wedge/`.
+
+**Painting it flat:** make a 1024 × 1024 canvas in Procreate, import
+`cheese-wedge-uv-template.png` as the top layer, and paint each face on the layers below,
+a little past its outline. Edges with the same number meet on the model; the dot marks
+the tip of the wedge. Hide the template, export as PNG, and save it as
+`src/assets/textures/cheese-wedge.png`.
+
+**Painting it in 3D:** import `cheese-wedge.obj` into Procreate (3D painting) and paint
+straight onto the wedge. Export the texture as PNG and save it under the same name. It
+uses the same layout as the template, so either way works.
+
+If the model ever changes, `npm run art:cheese-wedge` writes a fresh OBJ and template.
 
 ## Gunny's gun
 

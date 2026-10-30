@@ -23,6 +23,7 @@ Other commands:
 npm test         # checks the game logic (maze generation, movement, collisions)
 npm run build    # makes a static copy of the game in dist/ for hosting
 npm run build:artifact   # packs the whole game into one file: dist-artifact/rats-maze.html
+npm run art:cheese-wedge # exports the cheese wedge OBJ and its UV template to art/cheese-wedge/
 ```
 
 ## Controls
@@ -79,6 +80,8 @@ src/
     sound.js       how a sound reaches a listener through the maze
     collision.js   sliding along walls
     random.js      seeded random numbers
+  models/
+    cheeseWedge.js the collectible cheese wedge, built by hand with a paintable UV layout
   render/          what you see (three.js)
     world.js       walls, floor, ceiling, lamps
     cheeseView.js  the floating cheese wedges
@@ -100,6 +103,7 @@ src/
   ui/              HTML/CSS overlay: menus, crosshair, HUD
 src/assets/textures/   the texture files
 src/assets/ui/     HUD icons
+art/               files for drawing: UV templates and models to paint in Procreate
 tools/             helper scripts (placeholder textures, single-file build)
 tests/             logic tests
 ```

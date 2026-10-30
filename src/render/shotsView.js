@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cheeseMaterial, cheeseWedgeGeometry } from './cheeseView.js';
+import { cheeseMaterial, cheeseWedgeGeometry, cheeseWedgeMaterial } from './cheeseView.js';
 
 const CRUMBS_PER_SPLAT = 10;
 const CRUMB_LIFE = 0.7;
@@ -11,7 +11,8 @@ export function createShots(scene) {
   scene.add(group);
   const shotGeometry = cheeseWedgeGeometry(0.16, 0.1);
   const crumbGeometry = new THREE.BoxGeometry(0.045, 0.035, 0.045);
-  const material = cheeseMaterial();
+  const shotMaterial = cheeseWedgeMaterial();
+  const material = cheeseMaterial(); // crumbs
   const flying = new Map(); // shot id -> mesh
   let crumbs = [];
 
@@ -23,7 +24,7 @@ export function createShots(scene) {
         live.add(shot.id);
         let mesh = flying.get(shot.id);
         if (!mesh) {
-          mesh = new THREE.Mesh(shotGeometry, material);
+          mesh = new THREE.Mesh(shotGeometry, shotMaterial);
           flying.set(shot.id, mesh);
           group.add(mesh);
         }
