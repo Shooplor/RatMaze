@@ -23,7 +23,8 @@ const CROUCH = ['ControlLeft', 'ControlRight', 'KeyC'];
  * embedded previews, it falls back to drag-to-look, and E and F take over the buttons.
  */
 export class KeyboardMouseController {
-  constructor(element) {
+  /** @param signal stops all of this controller's listeners when aborted */
+  constructor(element, { signal } = {}) {
     this.element = element;
     this.keys = new Set();
     this.buttons = new Set(); // mouse buttons held: 0 left, 2 right
@@ -46,21 +47,21 @@ export class KeyboardMouseController {
       if (CROUCH.includes(e.code) && !e.repeat) this.crouched = !this.crouched;
       // Keep Ctrl+S, Ctrl+D and friends from opening browser dialogs mid-game.
       if (e.ctrlKey) e.preventDefault();
-    });
-    document.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    }, { signal });
+    document.addEventListener('keyup', (e) => this.keys.delete(e.code), { signal });
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.buttons.clear();
-    });
+    }, { signal });
 
     // In drag-to-look the buttons are for looking, so they don't shoot or suck.
     document.addEventListener('mousedown', (e) => {
       if (this.active && !this.dragToLook) this.buttons.add(e.button);
-    });
-    document.addEventListener('mouseup', (e) => this.buttons.delete(e.button));
+    }, { signal });
+    document.addEventListener('mouseup', (e) => this.buttons.delete(e.button), { signal });
     document.addEventListener('contextmenu', (e) => {
       if (this.active) e.preventDefault(); // right button is the vacuum, not a menu
-    });
+    }, { signal });
 
     document.addEventListener('mousemove', (e) => {
       if (!this.active || (this.dragToLook && e.buttons === 0)) return;
@@ -69,13 +70,13 @@ export class KeyboardMouseController {
       this.yaw -= e.movementX * MOUSE_SENSITIVITY;
       this.pitch -= e.movementY * MOUSE_SENSITIVITY;
       this.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, this.pitch));
-    });
+    }, { signal });
 
     document.addEventListener('pointerlockchange', () => {
       const locked = document.pointerLockElement === this.element;
       if (locked) this.everLocked = true;
       if (locked || !this.dragToLook) this.setActive(locked);
-    });
+    }, { signal });
   }
 
   /** Starts taking input. Browsers only allow capturing the mouse right after a click. */

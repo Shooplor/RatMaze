@@ -117,6 +117,13 @@ export function createAudio() {
       sounds[name](ctx, route(volume, position, inSight), ctx.currentTime, 1, noise);
     },
 
+    /** Shuts the audio down for good. */
+    close() {
+      ctx?.close();
+      ctx = null;
+      vacuum = null;
+    },
+
     /** Your own vacuum: 0 off, up to 1 at full power. */
     setVacuum(level) {
       vacuum?.set(level);

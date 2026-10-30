@@ -23,6 +23,7 @@ import { setCrispTextures, setMaxAnisotropy } from './render/textures.js';
 import { KeyboardMouseController } from './input/keyboardMouse.js';
 import { createAudio, DEFAULT_VOLUME } from './audio/audio.js';
 import { createHud } from './ui/hud.js';
+import { clearProblem, reportErrors, showProblem } from './ui/fatal.js';
 
 // Retro look: render at a fraction of the screen resolution and stretch with sharp pixels.
 const RETRO_LEVELS = [
@@ -46,11 +47,37 @@ const RAT_OPTIONS = {
   crouchSpeedFactor: CROUCH_SPEED_FACTOR,
 };
 
+// --- Start-up -----------------------------------------------------------------
+// The claude.ai viewer can deliver a new version of this page to a tab that already has
+// it open. If an older copy of the game is still running here, shut it down first.
+window.ratMazeGame?.dispose();
+const lifetime = new AbortController();
+const { signal } = lifetime;
+reportErrors(signal);
+
 // --- Renderer, scene, camera -----------------------------------------------
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (error) {
+  showProblem(
+    "Can't start 3D graphics",
+    'Your browser could not start WebGL, which the game needs. Try another browser, or check that hardware acceleration is turned on in your browser settings.',
+  );
+  throw error;
+}
 renderer.autoClear = false; // the maze and the overlay are drawn one after the other
 document.getElementById('game').appendChild(renderer.domElement);
+
+// The graphics card can drop the 3D view (driver reset, too many tabs using it), which
+// leaves a black screen. Say so, and recover if the browser hands it back.
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  controller.release();
+  showProblem('The 3D view stopped', 'Your graphics card dropped the game view. Reload the page to keep playing.');
+}, { signal });
+renderer.domElement.addEventListener('webglcontextrestored', () => clearProblem(), { signal });
 setMaxAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 
 const scene = new THREE.Scene();
@@ -66,7 +93,7 @@ const gun = createGun(overlay);
 const whirlwind = createWhirlwind(camera);
 const shotsView = createShots(scene);
 
-const controller = new KeyboardMouseController(renderer.domElement);
+const controller = new KeyboardMouseController(renderer.domElement, { signal });
 const view = new FirstPersonView(camera);
 const audio = createAudio();
 
@@ -217,6 +244,7 @@ function handleEvent(event) {
 // --- UI and settings -------------------------------------------------------
 
 const hud = createHud({
+  signal,
   onPlay: () => {
     audio.unlock(); // browsers allow sound only after a click
     if (match.state === 'over') loadMaze(randomSeed());
@@ -227,7 +255,7 @@ controller.onActiveChange = (active) => hud.setPlaying(active, { dragToLook: con
 renderer.domElement.addEventListener('click', () => {
   audio.unlock();
   if (!controller.active) controller.requestLock();
-});
+}, { signal });
 audio.setMuted(readSetting('muted', 'false') === 'true');
 const savedVolume = Number(readSetting('volume', DEFAULT_VOLUME));
 audio.setVolume(Number.isFinite(savedVolume) ? savedVolume : DEFAULT_VOLUME);
@@ -255,15 +283,15 @@ document.addEventListener('keydown', (e) => {
     writeSetting('volume', audio.volume);
     hud.toast(`Volume ${Math.round(audio.volume * 100)}%`, 1.2);
   }
-});
+}, { signal });
 
 // Pasting a link to a different maze switches to it.
 window.addEventListener('hashchange', () => {
   const linked = seedFromAddress();
   if (linked !== null && linked !== seed) loadMaze(linked);
-});
+}, { signal });
 
-window.addEventListener('resize', resize);
+window.addEventListener('resize', resize, { signal });
 resize();
 
 // --- Game loop -------------------------------------------------------------
@@ -279,6 +307,7 @@ let fps = { frames: 0, time: 0, value: 0 };
 loadMaze(seedFromAddress() ?? randomSeed());
 
 function frame(now) {
+  if (signal.aborted) return; // this copy of the game was shut down
   const dt = Math.min((now - lastTime) / 1000, 0.25);
   lastTime = now;
 
@@ -328,6 +357,18 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// Lets a newer copy of the game shut this one down (see Start-up above).
+window.ratMazeGame = {
+  dispose() {
+    lifetime.abort();
+    if (document.pointerLockElement) document.exitPointerLock();
+    audio.close();
+    renderer.dispose();
+    renderer.forceContextLoss(); // hand the graphics context back right away
+    renderer.domElement.remove();
+  },
+};
 
 // --- Helpers ---------------------------------------------------------------
 

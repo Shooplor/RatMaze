@@ -5,7 +5,7 @@ import cheeseIcon from '../assets/ui/hud-cheese.png';
  * The HTML layer over the 3D view: start/pause/result screen, crosshair, cheese counters,
  * short messages and the debug line.
  */
-export function createHud({ onPlay }) {
+export function createHud({ onPlay, signal }) {
   const $ = (id) => document.getElementById(id);
   const overlay = $('overlay');
   const title = $('overlay-title');
@@ -29,7 +29,10 @@ export function createHud({ onPlay }) {
   let toastTimer = null;
 
   $('carried-icon').src = cheeseIcon;
-  playButton.addEventListener('click', onPlay);
+  playButton.addEventListener('click', onPlay, { signal });
+  // Start from the start screen, even if an earlier copy of the game left the page mid-round.
+  overlay.hidden = false;
+  hud.hidden = true;
   $('touch-note').hidden = !window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
   function restartAnimation(element, className) {
