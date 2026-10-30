@@ -23,6 +23,14 @@ const RULES = {
   shotCost: 1,
   shotLifetime: 3,
   muzzle: { right: 0.2, down: 0.2, forward: 0.8 },
+  crouchEyeHeight: 1,
+  stepLength: 0.85,
+  walkLoudness: 1,
+  sneakLoudness: 0.3,
+  crouchLoudness: 0,
+  vacuumStartLoudness: 0.2,
+  vacuumRampTime: 3,
+  hearingRange: 16,
 };
 const EAST = yawFor(1, 0);
 const NORTH = yawFor(0, -1);
@@ -151,5 +159,57 @@ test('the exit opens once the maze is empty, and the first rat through wins', ()
   assert.equal(match.winner, rat);
   assert.equal(rat.delivered, 4);
   assert.equal(rat.carried, 0);
-  assert.deepEqual(types(match).filter((t) => t !== 'collected'), ['exitOpened', 'escaped']);
+  const rules = types(match).filter((t) => t !== 'collected' && t !== 'footstep');
+  assert.deepEqual(rules, ['exitOpened', 'escaped']);
+});
+
+test('walking makes a footstep every step length; sneaking is quieter and slower; crouching is silent', () => {
+  const steps = (stance) => {
+    const { maze, rat, match } = setup();
+    run(rat, match, maze, { forward: 1, yaw: EAST, ...stance }, 1);
+    const events = match.drainEvents().filter((e) => e.type === 'footstep');
+    return { count: events.length, loudness: events[0]?.loudness, walked: rat.x - 1.5 * T };
+  };
+  const walk = steps({});
+  const sneak = steps({ sneak: true });
+  const crouch = steps({ crouch: true });
+
+  assert.equal(walk.count, Math.floor(walk.walked / 0.85));
+  assert.equal(walk.loudness, 1);
+  assert.equal(sneak.loudness, 0.3);
+  assert.ok(sneak.walked < walk.walked * 0.6, 'sneaking is slower');
+  assert.equal(crouch.count, 0, 'crouched steps make no sound');
+  assert.ok(crouch.walked < sneak.walked, 'crouching is slowest');
+});
+
+test('standing still makes no footsteps', () => {
+  const { maze, rat, match } = setup();
+  run(rat, match, maze, { yaw: EAST }, 2);
+  assert.equal(match.drainEvents().filter((e) => e.type === 'footstep').length, 0);
+});
+
+test('the vacuum starts quiet and reaches full noise after the ramp time', () => {
+  const { maze, rat, match } = setup();
+  assert.equal(match.vacuumLoudness(rat), 0);
+  run(rat, match, maze, { suck: true, yaw: yawFor(-1, 0) }, 0.1);
+  const early = match.vacuumLoudness(rat);
+  run(rat, match, maze, { suck: true, yaw: yawFor(-1, 0) }, 1.4);
+  const middle = match.vacuumLoudness(rat);
+  run(rat, match, maze, { suck: true, yaw: yawFor(-1, 0) }, 2);
+  const late = match.vacuumLoudness(rat);
+  assert.ok(early < 0.25 && early >= 0.2, `early ${early}`);
+  assert.ok(middle > early && middle < late, `middle ${middle}`);
+  assert.equal(late, 1);
+
+  run(rat, match, maze, { yaw: yawFor(-1, 0) }, 1 / 60); // let go
+  assert.equal(match.vacuumLoudness(rat), 0);
+  run(rat, match, maze, { suck: true, yaw: yawFor(-1, 0) }, 0.1);
+  assert.ok(match.vacuumLoudness(rat) < 0.25, 'starts quiet again');
+});
+
+test('crouching lowers the gun, so shots start lower', () => {
+  const { rat, match } = setup();
+  const standing = match.muzzle(rat).y;
+  rat.crouching = true;
+  assert.ok(match.muzzle(rat).y < standing - 0.4);
 });

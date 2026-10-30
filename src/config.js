@@ -4,6 +4,7 @@
 export const TILE = 2.2;          // corridor width, and the size of one wall/floor texture
 export const WALL_HEIGHT = 2.2;   // equal to TILE so each wall face shows one square texture
 export const EYE_HEIGHT = 1.55;
+export const CROUCH_EYE_HEIGHT = 1.05;
 
 // Maze size in tiles (odd numbers). Play time grows with the corridors you have to walk:
 // 15 gives about 100 cheese, 17 about 130, 21 about 205.
@@ -13,6 +14,8 @@ export const BRAID = 0.6;         // share of dead ends knocked open into loops 
 
 export const RAT_RADIUS = 0.3;
 export const RAT_SPEED = 4.2;     // units per second
+export const SNEAK_SPEED_FACTOR = 0.55;  // holding Shift: quieter steps, slower
+export const CROUCH_SPEED_FACTOR = 0.45; // crouched: silent steps, slowest
 
 export const CHEESE_HEIGHT = 0.95;       // how high the cheese floats
 
@@ -29,6 +32,7 @@ export const FOG_FAR = TILE * 6;
 // The round's rules: Gunny's vacuum gun and its cheese shots.
 export const RULES = {
   eyeHeight: EYE_HEIGHT,
+  crouchEyeHeight: CROUCH_EYE_HEIGHT,
   ceilingHeight: WALL_HEIGHT,
   cheeseHeight: CHEESE_HEIGHT,
 
@@ -48,4 +52,13 @@ export const RULES = {
 
   // Where the nozzle sits relative to the eye. The gun on screen is placed to match.
   muzzle: { right: 0.26, down: 0.21, forward: 0.8 },
+
+  // Noise. Loudness 1 is a normal step; other rats hear it along the corridors.
+  stepLength: 0.85,        // units walked per footstep
+  walkLoudness: 1,
+  sneakLoudness: 0.3,
+  crouchLoudness: 0,       // crouched rats make no footstep sound at all
+  vacuumStartLoudness: 0.2, // the vacuum starts quiet...
+  vacuumRampTime: 3,       // ...and reaches full noise after this many seconds held
+  hearingRange: TILE * 8,  // how far, walking the corridors, a loudness-1 sound carries
 };

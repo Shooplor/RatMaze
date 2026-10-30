@@ -6,9 +6,9 @@ import { CheeseField } from './cheese.js';
  * out as ammo. Once the maze is empty the exit door opens; the first rat through it
  * banks the cheese it carries and ends the round.
  *
- * Everything that happens is queued as an event ('collected', 'fired', 'dryFire',
- * 'shotHit', 'exitOpened', 'escaped') so the screen, the sounds and later the network
- * can react without knowing the rules.
+ * Everything that happens is queued as an event ('footstep', 'collected', 'fired',
+ * 'dryFire', 'shotHit', 'exitOpened', 'escaped') so the screen, the sounds and later the
+ * network can react without knowing the rules.
  *
  * `rules` holds the numbers (see RULES in config.js): heights, vacuum reach and pull,
  * shot speed and cost, and where the gun's nozzle sits relative to the eye.
@@ -38,6 +38,7 @@ export class Match {
 
     for (const piece of this.cheese.pieces) piece.pulled = false;
     for (const rat of this.rats) {
+      this.footsteps(rat);
       if (rat.sucking) this.suck(rat, dt);
       this.shoot(rat, dt);
     }
@@ -57,6 +58,29 @@ export class Match {
     }
   }
 
+  /** A rat joining after the start (the testing wanderer, later late joiners). */
+  addRat(rat) {
+    this.rats.push(rat);
+  }
+
+  removeRat(rat) {
+    this.rats = this.rats.filter((r) => r !== rat);
+  }
+
+  /** How loud a rat's vacuum is: quiet when switched on, full after a few seconds held. */
+  vacuumLoudness(rat) {
+    if (!rat.sucking) return 0;
+    const { vacuumStartLoudness: start, vacuumRampTime: ramp } = this.rules;
+    const t = Math.min(1, rat.suckTime / ramp);
+    return start + (1 - start) * t * t;
+  }
+
+  /** How loud a rat's footsteps are in its current stance. */
+  stepLoudness(rat) {
+    const r = this.rules;
+    return rat.crouching ? r.crouchLoudness : rat.sneaking ? r.sneakLoudness : r.walkLoudness;
+  }
+
   /** Testing shortcut: hands every piece left in the maze to one rat. */
   giveAllCheese(rat) {
     if (this.state !== 'collecting') return;
@@ -70,6 +94,16 @@ export class Match {
     const events = this.events;
     this.events = [];
     return events;
+  }
+
+  // One footstep every stepLength walked. Silent steps (crouched) still count, so a rat
+  // standing up mid-stride doesn't get a free step.
+  footsteps(rat) {
+    rat.stepProgress += Math.hypot(rat.x - rat.prevX, rat.z - rat.prevZ);
+    if (rat.stepProgress < this.rules.stepLength) return;
+    rat.stepProgress -= this.rules.stepLength;
+    const loudness = this.stepLoudness(rat);
+    if (loudness > 0) this.events.push({ type: 'footstep', rat, x: rat.x, z: rat.z, loudness });
   }
 
   // The vacuum: pulls cheese in a cone in front of the rat toward its gun's nozzle,
@@ -167,13 +201,17 @@ export class Match {
     });
   }
 
+  eyeHeight(rat) {
+    return rat.crouching ? this.rules.crouchEyeHeight : this.rules.eyeHeight;
+  }
+
   /** Where the gun's nozzle is: in front of the eye, a little right and down. */
   muzzle(rat) {
     const { right, down, forward } = this.rules.muzzle;
     const { f, r, u } = viewBasis(rat.yaw, rat.pitch);
     return {
       x: rat.x + f.x * forward + r.x * right - u.x * down,
-      y: this.rules.eyeHeight + f.y * forward + r.y * right - u.y * down,
+      y: this.eyeHeight(rat) + f.y * forward + r.y * right - u.y * down,
       z: rat.z + f.z * forward + r.z * right - u.z * down,
     };
   }
@@ -184,7 +222,7 @@ export class Match {
     const STEP = 0.1;
     const MAX = 40;
     let x = rat.x;
-    let y = this.rules.eyeHeight;
+    let y = this.eyeHeight(rat);
     let z = rat.z;
     for (let d = 0; d < MAX; d += STEP) {
       const { cx, cz } = this.maze.cellAt(x + f.x * STEP, z + f.z * STEP);

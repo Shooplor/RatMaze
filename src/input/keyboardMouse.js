@@ -9,6 +9,10 @@ const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
 const SUCK = ['KeyE'];  // keyboard alternatives to the mouse buttons
 const FIRE = ['KeyF'];
+const SNEAK = ['ShiftLeft', 'ShiftRight'];
+// Crouch is a toggle. C does the same as Ctrl, and is safer: Ctrl+W closes the browser tab,
+// and no web page can stop that.
+const CROUCH = ['ControlLeft', 'ControlRight', 'KeyC'];
 
 /**
  * Turns keyboard and mouse into the rat command the simulation understands.
@@ -23,6 +27,7 @@ export class KeyboardMouseController {
     this.element = element;
     this.keys = new Set();
     this.buttons = new Set(); // mouse buttons held: 0 left, 2 right
+    this.crouched = false;
     this.yaw = 0;
     this.pitch = 0;
     this.active = false;      // taking input: mouse captured, or drag-to-look running
@@ -32,8 +37,15 @@ export class KeyboardMouseController {
 
     document.addEventListener('keydown', (e) => {
       // With a captured mouse the browser handles Esc itself and releases it.
-      if (e.code === 'Escape' && this.dragToLook) this.setActive(false);
-      else if (this.active) this.keys.add(e.code);
+      if (e.code === 'Escape' && this.dragToLook) {
+        this.setActive(false);
+        return;
+      }
+      if (!this.active) return;
+      this.keys.add(e.code);
+      if (CROUCH.includes(e.code) && !e.repeat) this.crouched = !this.crouched;
+      // Keep Ctrl+S, Ctrl+D and friends from opening browser dialogs mid-game.
+      if (e.ctrlKey) e.preventDefault();
     });
     document.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => {
@@ -121,6 +133,8 @@ export class KeyboardMouseController {
       pitch: this.pitch,
       suck: this.buttons.has(2) || held(SUCK) === 1,
       fire: this.buttons.has(0) || held(FIRE) === 1,
+      sneak: held(SNEAK) === 1,
+      crouch: this.crouched,
     };
   }
 }

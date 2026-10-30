@@ -5,7 +5,8 @@ before the rival rat does. Built with HTML, CSS, JavaScript and [three.js](https
 
 **Status:** Gunny's scrap vacuum gun sucks up cheese (right mouse) and shoots it back
 out (left mouse). Gather every piece, then follow the cheese compass to the exit door.
-No rival rat yet.
+Footsteps and the vacuum make noise other rats can hear; sneak or crouch to stay quiet.
+No rival rat yet (T lets a wandering test rat loose so you can hear one).
 
 ## Run it
 
@@ -33,16 +34,32 @@ npm run build:artifact   # packs the whole game into one file: dist-artifact/rat
 | Right mouse (hold) | Vacuum: pull cheese into the gun. You walk at half speed |
 | Left mouse | Shoot a piece of cheese (costs 1) |
 | E / F | Vacuum / shoot from the keyboard |
+| Shift (hold) | Sneak: quieter footsteps, slower |
+| Ctrl or C | Crouch on / off: silent footsteps, slowest. C is safer, since Ctrl+W closes the browser tab |
 | Esc | Pause |
+| M | Sound on / off |
 | P | Retro look: off / medium / heavy |
 | N | New maze |
 | K | Testing shortcut: collect all the cheese at once, to try the exit |
+| T | Testing: let a wandering rat loose (or remove it), to hear footsteps that aren't yours |
 
 Every maze comes from a number (its seed), shown bottom-left and at the end of the
 address (`#maze-1234`). The same seed always builds the same maze, so you can share one.
 
 If the browser won't capture the mouse (some embedded previews), the game switches to
 drag-to-look: hold a mouse button and drag.
+
+## Sound
+
+Footsteps and the vacuum are noise. Other rats hear it along the corridors (not through
+walls), quieter with distance and muffled when there is no straight line between you:
+
+- walking steps are loud, sneaking steps (Shift) quiet, crouched steps silent
+- the vacuum starts quiet and gets louder the longer you hold it, full after 3 seconds
+
+Your own footsteps play quieter than other rats', so theirs stand out. The noise meter
+next to your stance (bottom left) shows how loud you are right now. All sounds are
+synthesized in `src/audio/sounds.js`; recorded sounds can replace any of them later.
 
 ## Art
 
@@ -57,7 +74,8 @@ src/
     maze.js        maze generation (and hand-drawn ASCII layouts)
     rat.js         a rat: moves from a command, the same for player, bot and network
     cheese.js      which tiles still hold cheese
-    match.js       the round's rules: vacuum, shots, exit opening, escaping
+    match.js       the round's rules: vacuum, shots, footsteps, exit opening, escaping
+    sound.js       how a sound reaches a listener through the maze
     collision.js   sliding along walls
     random.js      seeded random numbers
   render/          what you see (three.js)
@@ -68,9 +86,15 @@ src/
     gunView.js     the first-person scrap gun (placeholder model) and its animation
     whirlwind.js   the vacuum's swirling wind effect
     shotsView.js   cheese shots in flight and the crumbs they burst into
+    ratView.js     another rat in the maze (placeholder model)
     compass.js     the cheese arrow pointing at the exit
     firstPersonView.js  camera at the rat's eyes, the A/D tilt, the rat's own light
     textures.js    texture loading and the crisp retro filtering
+  ai/
+    wanderBrain.js TESTING: a rat that wanders at random (T), to have something to hear
+  audio/
+    audio.js       the sound system: volume, 3D positioning, muffling
+    sounds.js      every sound, synthesized: footsteps, vacuum, shots, door
   input/           keyboard and mouse → rat commands
   ui/              HTML/CSS overlay: menus, crosshair, HUD
 src/assets/textures/   the texture files

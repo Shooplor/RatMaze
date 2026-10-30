@@ -165,6 +165,53 @@ body {
   }
 }
 
+#stance {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+#stance-label {
+  min-width: 72px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--parchment);
+  text-shadow: 0 1px 2px #000;
+}
+
+/* Five bars that light up with the noise you're making, like a volume meter. */
+#noise-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+}
+
+#noise-meter i {
+  width: 5px;
+  background: rgba(235, 220, 170, 0.18);
+  border-radius: 1px;
+}
+
+#noise-meter i:nth-child(1) { height: 20%; }
+#noise-meter i:nth-child(2) { height: 40%; }
+#noise-meter i:nth-child(3) { height: 60%; }
+#noise-meter i:nth-child(4) { height: 80%; }
+#noise-meter i:nth-child(5) { height: 100%; }
+
+#noise-meter i.on {
+  background: var(--parchment);
+}
+
+#noise-meter i.on:nth-child(n + 4) {
+  background: #e0833a;
+}
+
 #touch-note {
   margin: 16px 0 0;
   color: var(--cheese);

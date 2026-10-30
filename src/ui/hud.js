@@ -19,6 +19,8 @@ export function createHud({ onPlay }) {
   const carried = $('carried');
   const carriedCount = $('carried-count');
   const toast = $('toast');
+  const stanceLabel = $('stance-label');
+  const noiseBars = [...$('noise-meter').children];
   const debug = $('debug');
 
   const startText = { title: title.textContent, status: status.textContent, button: playButton.textContent };
@@ -99,6 +101,13 @@ export function createHud({ onPlay }) {
     clearToast() {
       clearTimeout(toastTimer);
       toast.hidden = true;
+    },
+
+    /** Your stance and how loud you are right now (0 silent to 1 full). */
+    setStance(name, noise) {
+      stanceLabel.textContent = name;
+      const lit = Math.round(Math.min(1, noise) * noiseBars.length);
+      noiseBars.forEach((bar, i) => bar.classList.toggle('on', i < lit));
     },
 
     setDebug(text) {
