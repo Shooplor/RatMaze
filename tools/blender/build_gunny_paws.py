@@ -233,18 +233,26 @@ def posed_thumb(hand, outside):
 
 
 def wrapped_thumb(hand, outside, aim, axis, curl):
-    """A thumb resting along a pipe: aimed at `aim`, then each joint curls round the pipe
-    (turning about `axis`, parallel to the pipe) by `curl` degrees, or less if it would
-    sink into it, so the thumb bends inward the way it hugs a handguard."""
+    """A thumb holding a pipe: aimed at `aim`, then each joint curls round the pipe (turning
+    about `axis`, parallel to it) until the next bone touches it, up to `curl` degrees (or
+    straightens a little if it would start inside), so the thumb lies pressed along it."""
     base = thumb_base(hand)
     direction = (aim - base).normalized()
     joints, total = [base], 0
+
+    def clear(start, step, length):
+        d = rotate(direction, axis, total + step)
+        return outside(start + d * length) > 0 and outside(start + d * length / 2) > 0
+
     for length, most in zip(THUMB_LENGTHS, curl):
-        chosen = most
-        for step in range(0, most + 1, 2):
-            if outside(joints[-1] + rotate(direction, axis, total + step) * length) <= 0:
-                chosen = max(0, step - 2)
-                break
+        if clear(joints[-1], 0, length):
+            chosen = most
+            for step in range(2, most + 1, 2):
+                if not clear(joints[-1], step, length):
+                    chosen = step - 2
+                    break
+        else:
+            chosen = next((step for step in range(-2, -41, -2) if clear(joints[-1], step, length)), -40)
         total += chosen
         joints.append(joints[-1] + rotate(direction, axis, total) * length)
     return joints, rotate(direction, axis, total), Vector(axis)  # the claw curls on round
@@ -572,12 +580,17 @@ def left_paw(materials):
     palm = -Vector((knuckles.x, knuckles.y, 0))                 # facing the barrel
     hand = Hand(knuckles - forward * 0.078 * S, forward, palm, right_handed=False)
     arm = (-hand.f + Vector((0, -0.45, 0.15))).normalized()      # a slight bend at the wrist
-    # The thumb runs forward along the barrel's near side, curling in round it: turning
-    # about -z swings it from the lower left up over the barrel.
-    aim = Vector((-0.075, -0.025, thumb_base(hand).z - 0.12))
+    # The thumb reaches up the barrel's near (left) side and curls in round it until it
+    # presses against it: turning about -z swings it up and over toward the top.
+    def thumb_outside(p):
+        return math.hypot(p.x, p.y) / (0.042 + THUMB_JOINT_R[1] + 0.001) - 1
+
+    side = math.radians(160)
+    aim = Vector((math.cos(side), math.sin(side), 0)) * (0.042 + THUMB_JOINT_R[1] + 0.014)
+    aim.z = thumb_base(hand).z - 0.07
 
     def thumb(hand):
-        return wrapped_thumb(hand, outside, aim, (0, 0, -1), curl=(8, 34, 48))
+        return wrapped_thumb(hand, thumb_outside, aim, (0, 0, -1), curl=(6, 60, 60))
 
     return paw("LeftPaw", hand, outside, arm, 31, materials, thumb=thumb)
 
