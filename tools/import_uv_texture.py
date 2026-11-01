@@ -10,6 +10,8 @@ Usage:
 e.g.
   python3 tools/import_uv_texture.py art/cheese-wedge/cheese-wedge-painted.png \\
       art/cheese-wedge/layout.json src/assets/textures/cheese-wedge.png
+  python3 tools/import_uv_texture.py art/gunny-paw/gunny-paw-painted.png \\
+      art/gunny-paw/layout.json src/assets/textures/gunny-paw.png
 """
 
 import json
@@ -24,18 +26,24 @@ PADDING = 32  # pixels of gap to fill around each face (at the painting's size)
 def main(painted_path, layout_path, out_path):
     painted = Image.open(painted_path).convert("RGB")
     layout = json.loads(open(layout_path).read())
-    scale = painted.width / layout["size"]
+    filled = fill_gaps(np.array(painted), layout, painted.width / layout["size"])
+    Image.fromarray(filled).save(out_path, optimize=True)
+    print(f"wrote {out_path} ({painted.width} x {painted.height}, gaps filled {PADDING} px out from each face)")
 
-    # Which pixels belong to a face, from the layout's outlines at the painting's size.
-    mask_img = Image.new("L", painted.size, 0)
+
+def fill_gaps(colour, layout, scale=1.0, padding=PADDING):
+    """`colour` (an RGB array) with the gaps around the layout's faces filled in from the
+    nearest face. `scale` is the image's size over the layout's."""
+    colour = colour.copy()
+    # Which pixels belong to a face, from the layout's outlines at the image's size.
+    mask_img = Image.new("L", (colour.shape[1], colour.shape[0]), 0)
     draw = ImageDraw.Draw(mask_img)
     for island in layout["islands"]:
         draw.polygon([(x * scale, y * scale) for x, y in island["outline"]], fill=255)
     inside = np.array(mask_img) > 0
-    colour = np.array(painted)
 
     # Grow the faces outward one pixel at a time, copying the colour from the face.
-    for _ in range(PADDING):
+    for _ in range(padding):
         grown = inside.copy()
         for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             src = np.roll(np.roll(inside, dy, axis=0), dx, axis=1)
@@ -44,9 +52,7 @@ def main(painted_path, layout_path, out_path):
             colour[take] = shifted[take]
             grown |= take
         inside = grown
-
-    Image.fromarray(colour).save(out_path, optimize=True)
-    print(f"wrote {out_path} ({painted.width} x {painted.height}, gaps filled {PADDING} px out from each face)")
+    return colour
 
 
 if __name__ == "__main__":

@@ -120,10 +120,14 @@ function buildScrapGun() {
 }
 
 /**
- * Gunny's paws holding the gun (tools/blender/build_gunny_paws.py). They're modelled in the
- * gun's own coordinates, so as children of the gun they follow its sway and recoil.
+ * Gunny's paw holding the gun (tools/blender/build_gunny_paws.py). It's modelled in the
+ * gun's own coordinates, so as a child of the gun it follows its sway and recoil.
  */
 function addPaws(gun) {
+  // The skin is painted: src/assets/textures/gunny-paw.png, on the model's UV layout
+  // (art/gunny-paw/ has the templates). Claws and fur keep their materials' colours.
+  const skin = loadTexture('gunny-paw.png');
+  skin.flipY = false; // glTF models lay their UVs out from the top of the image
   loadModel(
     pawsUrl,
     (gltf) => {
@@ -131,10 +135,10 @@ function addPaws(gun) {
         if (!object.isMesh) return;
         // Same lighting model as the rest of the gun.
         const old = object.material;
+        const painted = old.name === 'Skin';
         object.material = new THREE.MeshLambertMaterial({
-          color: old.color,
-          map: old.map,
-          vertexColors: Boolean(object.geometry.attributes.color), // skin fading into fur
+          color: painted ? 0xffffff : old.color,
+          map: painted ? skin : null,
         });
         old.dispose();
       });

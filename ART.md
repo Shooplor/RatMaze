@@ -65,19 +65,60 @@ Procreate opens the wedge already painted.
 If the model ever changes, `npm run art:cheese-wedge` writes a fresh OBJ, template and
 faces layer (2048 × 2048 by default; `--size` changes it).
 
-## Gunny's gun and paws
+## Gunny's gun and paw
 
 | File | What |
 |---|---|
 | Gun model | Gunny's scrap vacuum gun in first person. For now it is a placeholder built in code (`src/render/gunView.js`). Send the model as `.glb` if you can (`.fbx` or `.obj` also work, I'll convert it). I'll fit its size and position on screen and find the nozzle, where the whirlwind starts and shots come out. If it has a part that should spin while sucking, or a cheese jar that fills up, tell me which parts. |
-| `models/gunny-paws.glb` | Gunny's two paws holding the gun in first person: the right paw on the grip, the left cradling the barrel. Built in Blender by `tools/blender/build_gunny_paws.py` (`npm run art:gunny-paws`): pink rat hands with knuckle bulges, long dark claws and a jointed thumb (on the grip it folds over the fingers), fading into thin dark furry forearms. Hand and forearm are one piece, with no seam at the wrist. Coloured for now; the model has a UV layout, so a painted texture can go on it later. When the real gun arrives, the paws get re-posed to its grip and barrel. |
+| `models/gunny-paws.glb` | Gunny's right paw in first person: a fist on the gun's grip. Built in Blender by `tools/blender/build_gunny_paws.py` (`npm run art:gunny-paws`): a pink rat hand with knuckle bulges, long dark claws and the thumb folded over the fingers, fading into a short piece of dark furry forearm. Its surface is an even grid of four-sided faces, so a painted texture sits on it without stretching. When the real gun arrives, the paw gets re-posed to its grip. |
+
+## Gunny's paw texture
+
+| File | Canvas | Where it appears |
+|---|---|---|
+| `gunny-paw.png` | 2048 × 2048 | The skin of Gunny's paw (the claws and the tufts at the wrist keep their own colours). **Painted** on the paw's UV layout. For now it holds the paw's plain colours. |
+
+Everything you need is in `art/gunny-paw/`. The layout has four pieces, each standing
+upright with the fingers at the top and the forearm at the bottom:
+- the back of the hand, with the knuckles and the backs of the fingers;
+- the palm side, with the finger pads and the inside of the wrist;
+- the thumb's nail side;
+- the thumb pad.
+
+In the game the fist sits at the bottom of the screen. The thumb's nail side shows most,
+then the fingers and a little of the palm side.
+
+**Painting it flat (recommended):**
+
+1. Make a **2048 × 2048** canvas in Procreate.
+2. Insert `gunny-paw-uv-base.png` (Actions → Add → Insert a file) as the bottom layer. It
+   holds the paw's current colours on the pieces (pink skin darkening into fur toward the
+   forearm) and is transparent around them. Paint over it, or on layers above it set to
+   **Clipping Mask**, so the paint stays inside the pieces.
+3. Insert `gunny-paw-uv-template.png` as the **top** layer to find your way around. It shows
+   the outlines, a faint grid of the model's faces, and the names of the pieces and fingers.
+4. Hide the template, then Actions → Share → **PNG**, and send it over. Paint inside the
+   outlines; the gaps between pieces get filled in when it's imported (below).
+
+**Painting it in 3D:** import `gunny-paw.obj` into Procreate and paint straight onto the
+paw. Then Actions → Share → **Share Textures**, and send the **Colour** image from the zip.
+It uses the same layout, so either way works.
+
+**Putting a painting in:** the original goes in `art/gunny-paw/gunny-paw-painted.png`, and
+the game's copy is made from it with the gaps between the pieces filled in:
+
+    python3 tools/import_uv_texture.py art/gunny-paw/gunny-paw-painted.png \
+        art/gunny-paw/layout.json src/assets/textures/gunny-paw.png
+
+If the paw's shape changes (`npm run art:gunny-paws`, for example when it's re-posed to the
+real gun), it gets a new layout and fresh templates, and a painting made on the old layout
+has to be moved over to the new one.
 
 ## Coming in later steps
 
 | File | Canvas | What |
 |---|---|---|
 | Gunny | 1024 × 1024 | Gunny as other players see him (painted on the 3D model in Procreate) |
-| Gunny's paws | 2048 × 2048 | A painted texture for the first-person paws (template from their UV layout) |
 | Hero portrait | 1024 × 1536 | Character select card |
 | More HUD icons | 256 × 256 each | Health, cheese gun, and so on |
 

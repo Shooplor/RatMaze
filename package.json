@@ -10,7 +10,7 @@
     "test": "node --test \"tests/**/*.test.js\"",
     "build:artifact": "vite build --mode artifact && node tools/build-artifact.mjs",
     "art:cheese-wedge": "node tools/export-cheese-wedge.mjs && python3 tools/draw_uv_template.py",
-    "art:gunny-paws": ".blender/bin/python tools/blender/build_gunny_paws.py"
+    "art:gunny-paws": ".blender/bin/python tools/blender/build_gunny_paws.py && python3 tools/draw_paw_uv_template.py"
   },
   "dependencies": {
     "three": "^0.186.1"
