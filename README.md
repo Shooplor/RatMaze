@@ -104,6 +104,6 @@ src/
 src/assets/textures/   the texture files
 src/assets/ui/     HUD icons
 art/               files for drawing: UV templates and models to paint in Procreate
-tools/             helper scripts (placeholder textures, single-file build)
+tools/             helper scripts (placeholder textures, single-file build, UV templates, importing painted UV textures)
 tests/             logic tests
 ```

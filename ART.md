@@ -29,7 +29,7 @@ so a drawing that looks right on the iPad will look right in the game.
 
 | File | Canvas | Where it appears |
 |---|---|---|
-| `cheese-wedge.png` | 1024 × 1024 | The floating cheese you suck up, and the cheese you shoot. |
+| `cheese-wedge.png` | 1024 × 1024 or 2048 × 2048 | The floating cheese you suck up, and the cheese you shoot. **Painted** (your 3D painting from Procreate). |
 
 This one is painted onto the model's layout (its UVs), not tiled: each face of the wedge
 has its own area of the image. Everything you need is in `art/cheese-wedge/`.
@@ -41,8 +41,16 @@ the tip of the wedge. Hide the template, export as PNG, and save it as
 `src/assets/textures/cheese-wedge.png`.
 
 **Painting it in 3D:** import `cheese-wedge.obj` into Procreate (3D painting) and paint
-straight onto the wedge. Export the texture as PNG and save it under the same name. It
-uses the same layout as the template, so either way works.
+straight onto the wedge. Then Actions → Share → **Share Textures**: Procreate gives you a
+zip with a Colour, a Metallic and a Roughness image. The **Colour** one is the texture;
+the others aren't used. It uses the same layout as the template, so either way works.
+
+**Putting a painting in:** the original goes in `art/cheese-wedge/cheese-wedge-painted.png`,
+and the game's copy is made from it with the gaps between faces filled in (so no pale
+seams show when a wedge is far away):
+
+    python3 tools/import_uv_texture.py art/cheese-wedge/cheese-wedge-painted.png \
+        art/cheese-wedge/layout.json src/assets/textures/cheese-wedge.png
 
 If the model ever changes, `npm run art:cheese-wedge` writes a fresh OBJ and template.
 
