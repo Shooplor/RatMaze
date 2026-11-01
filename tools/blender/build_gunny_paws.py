@@ -173,7 +173,7 @@ THUMB_R = (0.0074 * S, 0.0061 * S, 0.0053 * S)
 THUMB_JOINT_R = (0.0072 * S, 0.0064 * S)
 
 
-def build_hand_blob(name, hand, outside, arm, fist=False, thumb_aim=None):
+def build_hand_blob(name, hand, outside, arm, fist=False, thumb=None):
     """The pink hand and its forearm as one body: the forearm, a long flat palm with tendon
     ridges, fingers and a thumb."""
     blob = Blob(name)
@@ -201,7 +201,12 @@ def build_hand_blob(name, hand, outside, arm, fist=False, thumb_aim=None):
         tips.append((joints[-1], tip_dir, bend_axis, scale))
         fingers.append(joints)
 
-    joints, tip_dir, bend_axis = fist_thumb(hand, *fingers[:2]) if fist else posed_thumb(hand, outside, thumb_aim)
+    if thumb:
+        joints, tip_dir, bend_axis = thumb(hand)
+    elif fist:
+        joints, tip_dir, bend_axis = fist_thumb(hand, *fingers[:2])
+    else:
+        joints, tip_dir, bend_axis = posed_thumb(hand, outside)
     for i, (a, b) in enumerate(zip(joints, joints[1:])):
         if i:
             blob.ball(a, THUMB_JOINT_R[i - 1])
@@ -216,17 +221,33 @@ def thumb_base(hand):
     return hand.wrist + hand.f * 0.014 * S + hand.index * 0.025 * S + hand.n * 0.007 * S
 
 
-def posed_thumb(hand, outside, aim=None):
+def posed_thumb(hand, outside):
     """An open or holding hand's thumb: out from the heel of the palm, forward and a little
-    to the palm side (or toward `aim`, a point it reaches for), curling toward the palm until
-    it touches whatever the hand holds."""
+    to the palm side, curling toward the palm until it touches whatever the hand holds."""
     f, n, idx = hand.f, hand.n, hand.index
-    base = thumb_base(hand)
-    direction = (aim - base).normalized() if aim else (f * 0.75 + idx * 0.5 + n * 0.3).normalized()
+    direction = (f * 0.75 + idx * 0.5 + n * 0.3).normalized()
     toward = (n - idx * 0.4).normalized()  # a thumb curls across the palm
     toward = (toward - direction * toward.dot(direction)).normalized()
-    return pose_chain(base, direction, toward, THUMB_LENGTHS, outside,
-                      max_bend=(30, 55, 50), rest_bend=(8, 16, 14) if aim is None else (2, 8, 8))
+    return pose_chain(thumb_base(hand), direction, toward, THUMB_LENGTHS, outside,
+                      max_bend=(30, 55, 50), rest_bend=(8, 16, 14))
+
+
+def wrapped_thumb(hand, outside, aim, axis, curl):
+    """A thumb resting along a pipe: aimed at `aim`, then each joint curls round the pipe
+    (turning about `axis`, parallel to the pipe) by `curl` degrees, or less if it would
+    sink into it, so the thumb bends inward the way it hugs a handguard."""
+    base = thumb_base(hand)
+    direction = (aim - base).normalized()
+    joints, total = [base], 0
+    for length, most in zip(THUMB_LENGTHS, curl):
+        chosen = most
+        for step in range(0, most + 1, 2):
+            if outside(joints[-1] + rotate(direction, axis, total + step) * length) <= 0:
+                chosen = max(0, step - 2)
+                break
+        total += chosen
+        joints.append(joints[-1] + rotate(direction, axis, total) * length)
+    return joints, rotate(direction, axis, total), Vector(axis)  # the claw curls on round
 
 
 def fist_thumb(hand, index, middle):
@@ -413,9 +434,9 @@ def wrist_tufts(part, arm, seed):
 
 # --- Putting a paw together ---------------------------------------------------------------
 
-def paw(name, hand, outside, arm_direction, seed, materials, fist=False, thumb_aim=None):
+def paw(name, hand, outside, arm_direction, seed, materials, fist=False, thumb=None):
     arm = arm_path(hand, arm_direction)
-    blob, tips = build_hand_blob(name, hand, outside, arm, fist, thumb_aim)
+    blob, tips = build_hand_blob(name, hand, outside, arm, fist, thumb)
 
     def hand_detail(p):
         """Most of the triangles go to the hand; the plainer forearm needs fewer."""
@@ -551,10 +572,14 @@ def left_paw(materials):
     palm = -Vector((knuckles.x, knuckles.y, 0))                 # facing the barrel
     hand = Hand(knuckles - forward * 0.078 * S, forward, palm, right_handed=False)
     arm = (-hand.f + Vector((0, -0.45, 0.15))).normalized()      # a slight bend at the wrist
-    # The thumb lies along the barrel's near side, pointing forward.
-    base = thumb_base(hand)
-    aim = Vector((-(0.042 + THUMB_R[1] + 0.003), -0.022, base.z - 0.12))
-    return paw("LeftPaw", hand, outside, arm, 31, materials, thumb_aim=aim)
+    # The thumb runs forward along the barrel's near side, curling in round it: turning
+    # about -z swings it from the lower left up over the barrel.
+    aim = Vector((-0.075, -0.025, thumb_base(hand).z - 0.12))
+
+    def thumb(hand):
+        return wrapped_thumb(hand, outside, aim, (0, 0, -1), curl=(8, 34, 48))
+
+    return paw("LeftPaw", hand, outside, arm, 31, materials, thumb=thumb)
 
 
 def material(name, colour, roughness):
