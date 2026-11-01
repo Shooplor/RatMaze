@@ -54,7 +54,7 @@ export const RULES = {
   muzzle: { right: 0.26, down: 0.21, forward: 0.8 },
 
   // Noise. Loudness 1 is a normal step; other rats hear it along the corridors.
-  stepLength: 0.85,        // units walked per footstep
+  stepLength: 1.7,         // units walked per footstep: about 2.5 steps a second when walking
   walkLoudness: 1,
   sneakLoudness: 0.3,
   crouchLoudness: 0,       // crouched rats make no footstep sound at all

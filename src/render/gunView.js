@@ -1,11 +1,22 @@
 import * as THREE from 'three';
 import { RULES } from '../config.js';
-import { cheeseMaterial } from './cheeseView.js';
+import { loadTexture } from './textures.js';
+import { glowSprite, TOXIC_GOLD, TOXIC_GREEN } from './glow.js';
 
 const JAR_FULL_AT = 40;   // carried cheese that fills the jar on top
 const SCALE = 0.62;       // the model is built at a comfortable size, then shrunk to sit in view
 const RECOIL_KICK = 1;    // added per shot, decays back to 0
 const RECOIL_DECAY = 14;
+const FLASH_DECAY = 9;    // how fast the jar and nozzle flash fades after a shot
+const BUBBLES = 7;
+
+// Looking around: the gun drifts a little the way you turn (left, right, up, down) and
+// eases back when you stop. Offsets are per radian-per-second of turning, with limits.
+const LOOK_SHIFT = 0.009;
+const LOOK_SHIFT_MAX = 0.03;
+const LOOK_TURN = 0.025;
+const LOOK_TURN_MAX = 0.09;
+const LOOK_EASE = 10;
 
 const metal = (color) => new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
 const MATERIALS = {
@@ -21,7 +32,7 @@ const MATERIALS = {
 /**
  * PLACEHOLDER: Gunny's vacuum gun knocked together from scrap: a funnel nozzle, a rusty
  * pipe, a taped joint, a motor block and a glass jar on top that fills with the cheese
- * you carry. It will be replaced by the real model.
+ * you carry, glowing toxic gold. It will be replaced by the real model.
  *
  * Built nozzle-first: the mouth of the funnel is at (0, 0, 0) and the gun runs back
  * along +z toward the player.
@@ -68,24 +79,52 @@ function buildScrapGun() {
   add(new THREE.BoxGeometry(0.04, 0.14, 0.055), MATERIALS.grip, 0, -0.1, 0.52, 0.35);
 
   // Glass jar on top, filled with cheese as you collect, with a hose down to the barrel.
+  // The cheese in it steeps in something toxic: it glows gold, bubbles, and lights the gun.
   const jarY = 0.1;
   const jarZ = 0.27;
   add(new THREE.CylinderGeometry(0.04, 0.04, 0.012, 12), MATERIALS.darkSteel, 0, jarY - 0.05, jarZ);
   add(new THREE.CylinderGeometry(0.042, 0.042, 0.015, 12), MATERIALS.darkSteel, 0, jarY + 0.052, jarZ);
-  const fill = add(new THREE.CylinderGeometry(0.033, 0.033, 1, 12), cheeseMaterial(), 0, jarY - 0.044, jarZ);
+  const fillMaterial = new THREE.MeshLambertMaterial({
+    map: loadTexture('cheese.png'),
+    emissive: TOXIC_GOLD,
+    emissiveIntensity: 0.8,
+  });
+  const fill = add(new THREE.CylinderGeometry(0.033, 0.033, 1, 12), fillMaterial, 0, jarY - 0.044, jarZ);
   add(new THREE.CylinderGeometry(0.038, 0.038, 0.095, 12, 1, true), MATERIALS.glass, 0, jarY, jarZ);
   add(new THREE.TorusGeometry(0.06, 0.009, 6, 10, Math.PI), MATERIALS.darkSteel, 0.035, 0.035, 0.27, 0, Math.PI / 2, 0);
 
-  return { gun, fins, fill };
+  const bubbleMaterial = new THREE.MeshBasicMaterial({ color: TOXIC_GREEN });
+  const bubbles = Array.from({ length: BUBBLES }, (_, i) => {
+    const mesh = add(new THREE.SphereGeometry(0.005, 6, 4), bubbleMaterial, 0, 0, jarZ);
+    return { mesh, angle: i * 2.4, radius: 0.008 + (i % 3) * 0.008, rise: (i / BUBBLES) % 1, speed: 0.6 + (i % 4) * 0.2 };
+  });
+
+  // Golden light from the jar onto the gun around it.
+  const jarLight = new THREE.PointLight(TOXIC_GOLD, 0, 0.32, 0);
+  jarLight.position.set(0, jarY + 0.02, jarZ);
+  gun.add(jarLight);
+  const jarHalo = glowSprite(TOXIC_GOLD, 0);
+  jarHalo.position.set(0, jarY, jarZ);
+  jarHalo.scale.setScalar(0.22);
+  gun.add(jarHalo);
+
+  // A puff of golden light at the nozzle when a shot goes out.
+  const muzzleFlash = glowSprite(TOXIC_GOLD, 0);
+  muzzleFlash.position.set(0, 0, -0.02);
+  muzzleFlash.scale.setScalar(0.3);
+  gun.add(muzzleFlash);
+
+  return { gun, fins, fill, fillMaterial, bubbles, jarY, jarLight, jarHalo, muzzleFlash };
 }
 
 /**
  * The gun in first person, on the overlay layer (so it never pokes into walls).
  * Placed so its nozzle sits exactly where the rules say shots come from, with a little
- * sway while walking, a kick when firing, and a rattle while the vacuum runs.
+ * sway while walking, a drift the way you turn, a kick when firing, and a rattle while
+ * the vacuum runs.
  */
 export function createGun(overlay) {
-  const { gun, fins, fill } = buildScrapGun();
+  const { gun, fins, fill, fillMaterial, bubbles, jarY, jarLight, jarHalo, muzzleFlash } = buildScrapGun();
   gun.scale.setScalar(SCALE); // around the nozzle, which stays at the origin
   const root = new THREE.Group();
   root.add(gun);
@@ -103,6 +142,8 @@ export function createGun(overlay) {
   let phase = 0;
   let suckBlend = 0; // 0 off, 1 sucking, eased
   let jar = 0;
+  let flash = 0;     // 1 right after a shot, fading
+  const look = { yaw: null, pitch: 0, turnX: 0, turnY: 0 }; // turning speed, eased
 
   return {
     /** Nozzle position in view space this frame, for effects that start at the gun. */
@@ -110,30 +151,76 @@ export function createGun(overlay) {
 
     kick() {
       recoil = Math.min(1.5, recoil + RECOIL_KICK);
+      flash = 1;
     },
 
-    update(dt, time, { moving, sucking, carried }) {
+    /** @param yaw, pitch where you're looking now: the gun drifts the way you turn */
+    update(dt, time, { moving, sucking, carried, yaw, pitch }) {
       walk += ((moving ? 1 : 0) - walk) * Math.min(1, dt * 8);
       suckBlend += ((sucking ? 1 : 0) - suckBlend) * Math.min(1, dt * 10);
       recoil *= Math.exp(-dt * RECOIL_DECAY);
       phase += dt * (sucking ? 4.5 : 9) * walk; // half-speed steps while sucking
       jar += (Math.min(1, carried / JAR_FULL_AT) - jar) * Math.min(1, dt * 6);
 
+      flash *= Math.exp(-dt * FLASH_DECAY);
+
+      // How fast you're turning (radians per second), smoothed. Turning left raises yaw.
+      if (look.yaw === null || dt <= 0) {
+        look.yaw = yaw;
+        look.pitch = pitch;
+      }
+      const turnYaw = dt > 0 ? Math.atan2(Math.sin(yaw - look.yaw), Math.cos(yaw - look.yaw)) / dt : 0;
+      const turnPitch = dt > 0 ? (pitch - look.pitch) / dt : 0;
+      look.yaw = yaw;
+      look.pitch = pitch;
+      const ease = 1 - Math.exp(-dt * LOOK_EASE);
+      look.turnX += (turnYaw - look.turnX) * ease;
+      look.turnY += (turnPitch - look.turnY) * ease;
+      const clamp = (v, max) => Math.max(-max, Math.min(max, v));
+      const lookX = clamp(-look.turnX * LOOK_SHIFT, LOOK_SHIFT_MAX); // turning left moves it left
+      const lookY = clamp(look.turnY * LOOK_SHIFT, LOOK_SHIFT_MAX);  // looking up moves it up
+      const lookYaw = clamp(look.turnX * LOOK_TURN, LOOK_TURN_MAX);
+      const lookPitch = clamp(look.turnY * LOOK_TURN, LOOK_TURN_MAX);
+
       const swayX = Math.cos(phase) * 0.012 * walk + Math.sin(time * 1.3) * 0.002;
       const swayY = Math.abs(Math.sin(phase)) * 0.01 * walk + Math.sin(time * 1.9) * 0.002;
       const rattle = Math.sin(time * 70) * 0.0025 * suckBlend;
 
       root.position.set(
-        base.x + swayX + rattle,
-        base.y + swayY - rattle * 0.5,
-        base.z + recoil * 0.06 + suckBlend * 0.015,
+        base.x + swayX + rattle + lookX,
+        base.y + swayY - rattle * 0.5 + lookY,
+        base.z + recoil * 0.085 + suckBlend * 0.015,
       );
-      root.rotation.set(aimPitch + recoil * 0.12, aimYaw, swayX * 0.6);
+      root.rotation.set(
+        aimPitch + recoil * 0.2 + lookPitch,
+        aimYaw + lookYaw,
+        swayX * 0.6 - recoil * 0.05 + lookYaw * 0.5,
+      );
       muzzle.copy(root.position);
 
       fins.rotation.z += dt * (1 + suckBlend * 25);
       fill.scale.y = Math.max(0.001, jar * 0.088);
-      fill.position.y = 0.1 - 0.044 + fill.scale.y / 2;
+      fill.position.y = jarY - 0.044 + fill.scale.y / 2;
+
+      // Toxic glow: stronger the fuller the jar, pulsing slowly, flaring when a shot is
+      // dipped in it on the way out.
+      const pulse = 0.85 + 0.15 * Math.sin(time * 3.1);
+      const glow = jar > 0.001 ? (0.35 + 0.65 * jar) * pulse : 0;
+      fillMaterial.emissiveIntensity = 0.5 + 0.5 * pulse + flash * 1.2;
+      jarLight.intensity = glow * 2.2 + flash * 4;
+      jarHalo.material.opacity = Math.min(1, glow * 0.35 + flash * 0.6);
+      muzzleFlash.material.opacity = flash;
+      muzzleFlash.scale.setScalar(0.18 + flash * 0.25);
+
+      // Bubbles rise through the glowing cheese and pop at its surface.
+      const top = fill.scale.y;
+      bubbles.forEach((b) => {
+        b.rise = (b.rise + dt * b.speed * (1 + suckBlend)) % 1;
+        b.mesh.visible = top > 0.01;
+        b.mesh.position.x = Math.cos(b.angle + time * 0.8) * b.radius;
+        b.mesh.position.y = jarY - 0.044 + b.rise * top;
+        b.mesh.position.z = 0.27 + Math.sin(b.angle + time * 0.8) * b.radius;
+      });
     },
   };
 }

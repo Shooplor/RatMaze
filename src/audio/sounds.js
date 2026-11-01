@@ -46,11 +46,10 @@ function tone(ctx, out, when, { type = 'sine', from, to, peak, attack = 0.003, d
   osc.stop(when + attack + decay + 0.05);
 }
 
-/** A rat's step on stone: two quick claw clicks and a soft pad thud. */
+/** A rat's step on stone: a soft pad thud with a light scrape of claws, one sound per step. */
 export function footstep(ctx, out, when, volume, noise) {
-  noiseBurst(ctx, out, when, noise, { type: 'bandpass', frequency: rand(2600, 4000), q: 2.2, peak: 0.9 * volume, decay: 0.04 });
-  noiseBurst(ctx, out, when + rand(0.03, 0.05), noise, { type: 'bandpass', frequency: rand(2400, 3600), q: 2.2, peak: 0.5 * volume, decay: 0.035 });
-  tone(ctx, out, when, { from: rand(120, 160), to: 55, peak: 0.55 * volume, decay: 0.09 });
+  tone(ctx, out, when, { from: rand(110, 150), to: 50, peak: 0.6 * volume, attack: 0.004, decay: 0.11 });
+  noiseBurst(ctx, out, when, noise, { type: 'bandpass', frequency: rand(1800, 2800), q: 1.4, peak: 0.45 * volume, attack: 0.004, decay: 0.06 });
 }
 
 /**

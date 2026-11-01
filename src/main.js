@@ -151,7 +151,7 @@ function loadMaze(newSeed) {
   accumulator = 0;
   showSeedInAddress(seed);
 
-  if (import.meta.env.DEV) window.ratMaze = { maze, player, match, controller, camera, scene };
+  if (import.meta.env.DEV) window.ratMaze = { maze, player, match, controller, camera, scene, gun, view };
 }
 
 // Testing: a rat that wanders the corridors so you can hear footsteps that aren't yours.
@@ -204,6 +204,7 @@ function handleEvent(event) {
     case 'fired':
       if (mine) {
         gun.kick();
+        view.recoil();
         hud.setCarried(player.carried);
         audio.play('shot');
       }
@@ -215,7 +216,7 @@ function handleEvent(event) {
       }
       break;
     case 'shotHit':
-      shotsView.splat(event.x, event.y, event.z);
+      shotsView.splat(event.x, event.y, event.z, event.shot.id);
       playFrom('splat', event, SPLAT_LOUDNESS);
       break;
     case 'exitOpened': {
@@ -329,12 +330,14 @@ function frame(now) {
   view.update(player, alpha, cmd, dt);
   for (const v of [world, cheeseView, exitView]) v.update(time, dt);
   compass.update(dt, camera.position, cmd.yaw, exitView.position);
-  shotsView.sync(match.shots, alpha, time);
+  shotsView.sync(match.shots, alpha, time, dt);
   shotsView.update(dt);
   gun.update(dt, time, {
     moving: playing && (cmd.forward !== 0 || cmd.right !== 0),
     sucking: playing && cmd.suck,
     carried: player.carried,
+    yaw: cmd.yaw,
+    pitch: cmd.pitch,
   });
   whirlwind.update(dt, time, playing && cmd.suck, gun.muzzle);
   wanderer?.view.update(wanderer.rat, alpha, dt);
@@ -342,7 +345,7 @@ function frame(now) {
   const vacuumNoise = playing ? match.vacuumLoudness(player) : 0;
   audio.setVacuum(vacuumNoise);
   audio.setListener(camera.position, camera.getWorldDirection(lookDirection));
-  stepNoise *= Math.exp(-dt * 2.5); // fades between steps, so walking keeps the meter up
+  stepNoise *= Math.exp(-dt * 1.5); // fades between steps, so walking keeps the meter up
   hud.setStance(
     player.crouching ? 'Crouched' : player.sneaking ? 'Sneaking' : 'Walking',
     Math.max(stepNoise, vacuumNoise),
