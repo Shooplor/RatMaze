@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 export default defineConfig(({ mode }) => ({
   // Relative paths so the built game runs from any folder or host.
   base: './',
+  // 3D models are files the game loads, like images.
+  assetsInclude: ['**/*.glb'],
   build: {
     // three.js alone is ~550 kB, so the default 500 kB warning would always fire.
     chunkSizeWarningLimit: 1000,

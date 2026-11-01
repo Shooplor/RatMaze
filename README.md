@@ -24,7 +24,11 @@ npm test         # checks the game logic (maze generation, movement, collisions)
 npm run build    # makes a static copy of the game in dist/ for hosting
 npm run build:artifact   # packs the whole game into one file: dist-artifact/rats-maze.html
 npm run art:cheese-wedge # exports the cheese wedge OBJ and its UV template to art/cheese-wedge/
+npm run art:gunny-paws   # rebuilds Gunny's first-person paws in Blender (see below)
 ```
+
+Rebuilding the paws needs Blender's Python module, installed once into `.blender/`:
+`python3 -m venv .blender && .blender/bin/pip install bpy`.
 
 ## Controls
 
@@ -103,7 +107,9 @@ src/
   ui/              HTML/CSS overlay: menus, crosshair, HUD
 src/assets/textures/   the texture files
 src/assets/ui/     HUD icons
+src/assets/models/ 3D models (Gunny's first-person paws)
 art/               files for drawing: UV templates and models to paint in Procreate
 tools/             helper scripts (placeholder textures, single-file build, UV templates, importing painted UV textures)
+tools/blender/     Blender scripts that build 3D models
 tests/             logic tests
 ```

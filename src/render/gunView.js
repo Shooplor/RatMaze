@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RULES } from '../config.js';
+import pawsUrl from '../assets/models/gunny-paws.glb';
 import { loadTexture } from './textures.js';
 import { glowSprite, TOXIC_GOLD, TOXIC_GREEN } from './glow.js';
 
@@ -118,6 +120,32 @@ function buildScrapGun() {
 }
 
 /**
+ * Gunny's paws holding the gun (tools/blender/build_gunny_paws.py). They're modelled in the
+ * gun's own coordinates, so as children of the gun they follow its sway and recoil.
+ */
+function addPaws(gun) {
+  new GLTFLoader().load(
+    pawsUrl,
+    (gltf) => {
+      gltf.scene.traverse((object) => {
+        if (!object.isMesh) return;
+        // Same lighting model as the rest of the gun.
+        const old = object.material;
+        object.material = new THREE.MeshLambertMaterial({
+          color: old.color,
+          map: old.map,
+          vertexColors: Boolean(object.geometry.attributes.color), // skin fading into fur
+        });
+        old.dispose();
+      });
+      gun.add(gltf.scene);
+    },
+    undefined,
+    (error) => console.warn("Couldn't load Gunny's paws", error),
+  );
+}
+
+/**
  * The gun in first person, on the overlay layer (so it never pokes into walls).
  * Placed so its nozzle sits exactly where the rules say shots come from, with a little
  * sway while walking, a drift the way you turn, a kick when firing, and a rattle while
@@ -126,6 +154,7 @@ function buildScrapGun() {
 export function createGun(overlay) {
   const { gun, fins, fill, fillMaterial, bubbles, jarY, jarLight, jarHalo, muzzleFlash } = buildScrapGun();
   gun.scale.setScalar(SCALE); // around the nozzle, which stays at the origin
+  addPaws(gun);
   const root = new THREE.Group();
   root.add(gun);
   overlay.scene.add(root);

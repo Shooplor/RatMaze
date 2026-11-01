@@ -65,18 +65,19 @@ Procreate opens the wedge already painted.
 If the model ever changes, `npm run art:cheese-wedge` writes a fresh OBJ, template and
 faces layer (2048 × 2048 by default; `--size` changes it).
 
-## Gunny's gun
+## Gunny's gun and paws
 
 | File | What |
 |---|---|
 | Gun model | Gunny's scrap vacuum gun in first person. For now it is a placeholder built in code (`src/render/gunView.js`). Send the model as `.glb` if you can (`.fbx` or `.obj` also work, I'll convert it). I'll fit its size and position on screen and find the nozzle, where the whirlwind starts and shots come out. If it has a part that should spin while sucking, or a cheese jar that fills up, tell me which parts. |
+| `models/gunny-paws.glb` | Gunny's two paws holding the gun in first person: the right paw on the grip, the left cradling the barrel. Built in Blender by `tools/blender/build_gunny_paws.py` (`npm run art:gunny-paws`): pink rat hands with knuckle bulges, long dark claws and a small thumb, fading into thin dark furry forearms. Coloured for now; the model has a UV layout, so a painted texture can go on it later. When the real gun arrives, the paws get re-posed to its grip and barrel. |
 
 ## Coming in later steps
 
 | File | Canvas | What |
 |---|---|---|
 | Gunny | 1024 × 1024 | Gunny as other players see him (painted on the 3D model in Procreate) |
-| Gunny's arms | 1024 × 1024 | First-person paw (painted on the 3D model in Procreate) |
+| Gunny's paws | 2048 × 2048 | A painted texture for the first-person paws (template from their UV layout) |
 | Hero portrait | 1024 × 1536 | Character select card |
 | More HUD icons | 256 × 256 each | Health, cheese gun, and so on |
 
