@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RULES } from '../config.js';
 import pawsUrl from '../assets/models/gunny-paws.glb';
 import { loadTexture } from './textures.js';
 import { glowSprite, TOXIC_GOLD, TOXIC_GREEN } from './glow.js';
+import { loadModel } from './models.js';
 
 const JAR_FULL_AT = 40;   // carried cheese that fills the jar on top
 const SCALE = 0.62;       // the model is built at a comfortable size, then shrunk to sit in view
@@ -124,7 +124,7 @@ function buildScrapGun() {
  * gun's own coordinates, so as children of the gun they follow its sway and recoil.
  */
 function addPaws(gun) {
-  new GLTFLoader().load(
+  loadModel(
     pawsUrl,
     (gltf) => {
       gltf.scene.traverse((object) => {
@@ -140,7 +140,6 @@ function addPaws(gun) {
       });
       gun.add(gltf.scene);
     },
-    undefined,
     (error) => console.warn("Couldn't load Gunny's paws", error),
   );
 }
