@@ -34,11 +34,18 @@ so a drawing that looks right on the iPad will look right in the game.
 This one is painted onto the model's layout (its UVs), not tiled: each face of the wedge
 has its own area of the image. Everything you need is in `art/cheese-wedge/`.
 
-**Painting it flat:** make a 1024 × 1024 canvas in Procreate, import
-`cheese-wedge-uv-template.png` as the top layer, and paint each face on the layers below,
-a little past its outline. Edges with the same number meet on the model; the dot marks
-the tip of the wedge. Hide the template, export as PNG, and save it as
-`src/assets/textures/cheese-wedge.png`.
+**Painting it flat (recommended: every layer, opacity and effect works):**
+
+1. Make a **2048 × 2048** canvas in Procreate.
+2. Insert `cheese-wedge-uv-faces.png` (Actions → Add → Insert a file) and keep it as
+   the bottom layer: it's the five faces filled grey.
+3. Paint on layers above it, each set to **Clipping Mask** (tap the layer → Clipping
+   Mask), so the paint stays inside the faces by itself. To carry on from the 3D painting,
+   insert `cheese-wedge-painted.png` as one of those clipped layers.
+4. Insert `cheese-wedge-uv-template.png` as the **top** layer to find your way around:
+   edges with the same number meet on the model, and the dot marks the tip of the wedge.
+5. Hide the template, then Actions → Share → **PNG**, and send it over. Paint inside the
+   outlines; the gaps between faces get filled in when it's imported (below).
 
 **Painting it in 3D:** import `cheese-wedge.obj` into Procreate (3D painting) and paint
 straight onto the wedge. Then Actions → Share → **Share Textures**: Procreate gives you a
@@ -52,7 +59,11 @@ seams show when a wedge is far away):
     python3 tools/import_uv_texture.py art/cheese-wedge/cheese-wedge-painted.png \
         art/cheese-wedge/layout.json src/assets/textures/cheese-wedge.png
 
-If the model ever changes, `npm run art:cheese-wedge` writes a fresh OBJ and template.
+To finish a flat painting in 3D, the OBJ can be packed with the latest texture so
+Procreate opens the wedge already painted.
+
+If the model ever changes, `npm run art:cheese-wedge` writes a fresh OBJ, template and
+faces layer (2048 × 2048 by default; `--size` changes it).
 
 ## Gunny's gun
 

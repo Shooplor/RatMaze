@@ -1,12 +1,16 @@
-"""Draws the cheese wedge's UV template and its placeholder texture from art/cheese-wedge/layout.json.
+"""Draws the cheese wedge's UV template, faces layer and placeholder texture from
+art/cheese-wedge/layout.json.
 
   art/cheese-wedge/cheese-wedge-uv-template.png   outlines, labels and numbered edges on a
-      transparent background: put it on the top layer in Procreate and paint underneath
+      transparent background: the top layer in Procreate, for finding your way around
+  art/cheese-wedge/cheese-wedge-uv-faces.png      just the faces, filled grey, transparent
+      everywhere else: the bottom layer, to clip your paint layers to
   src/assets/textures/cheese-wedge.png            placeholder texture the game uses until
-      the real drawing replaces it (only written if missing, or with --force)
-  art/cheese-wedge/cheese-wedge.png               copy of the texture, next to the OBJ
+      a painting replaces it (only written if missing, or with --force)
+  art/cheese-wedge/cheese-wedge.png               copy of the game's texture, next to the OBJ
 
-Run with `npm run art:cheese-wedge` (it exports the layout first).
+Usage: python3 tools/draw_uv_template.py [--size 2048] [--force]
+(`npm run art:cheese-wedge` exports the layout first, then runs this.)
 """
 
 import json
@@ -22,6 +26,7 @@ ART = ROOT / "art" / "cheese-wedge"
 TEXTURE = ROOT / "src" / "assets" / "textures" / "cheese-wedge.png"
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+DEFAULT_SIZE = 2048  # the size Procreate's 3D painting uses, so flat and 3D work match
 
 # One colour per shared edge, so matching edges are easy to spot.
 EDGE_COLOURS = {
@@ -33,9 +38,9 @@ INK = (60, 40, 15, 255)
 
 def font(size, bold=False):
     try:
-        return ImageFont.truetype(BOLD if bold else FONT, size)
+        return ImageFont.truetype(BOLD if bold else FONT, round(size))
     except OSError:
-        return ImageFont.load_default(size)
+        return ImageFont.load_default(round(size))
 
 
 def centroid(points):
@@ -60,48 +65,76 @@ def centred_text(draw, xy, text, face, fill):
     draw.text((xy[0] - w / 2, xy[1]), text, font=face, fill=fill)
 
 
-def draw_guides(img, layout, labels=True):
-    """Outlines, numbered edges, labels and the legend."""
-    draw = ImageDraw.Draw(img)
+def scaled(layout, k):
+    """The layout's islands with every point multiplied by k (layout.json is in 1024 pixels)."""
+    pt = lambda p: (p[0] * k, p[1] * k)
+    islands = []
     for island in layout["islands"]:
+        islands.append({
+            **island,
+            "outline": [pt(p) for p in island["outline"]],
+            "edges": [{"id": e["id"], "points": [pt(p) for p in e["points"]]} for e in island["edges"]],
+            "labelAt": pt(island["labelAt"]) if "labelAt" in island else None,
+            "tip": pt(island["tip"]) if "tip" in island else None,
+        })
+    legend = {key: v * k for key, v in layout["legend"].items()}
+    return islands, legend
+
+
+def draw_guides(img, layout, k):
+    """Outlines, numbered edges, labels and the legend, at k times the layout's size."""
+    islands, legend = scaled(layout, k)
+    draw = ImageDraw.Draw(img)
+    for island in islands:
         cx, cy = centroid(island["outline"])
         for edge in island["edges"]:
             colour = EDGE_COLOURS[edge["id"]] + (255,)
-            draw.line([tuple(p) for p in edge["points"]], fill=colour, width=7, joint="curve")
+            draw.line(edge["points"], fill=colour, width=round(7 * k), joint="curve")
         for edge in island["edges"]:
             # Number tag just inside the face, at the middle of its edge.
             mx, my = point_along(edge["points"], 0.5)
             dx, dy = cx - mx, cy - my
             d = max(1, (dx * dx + dy * dy) ** 0.5)
-            tx, ty = mx + dx / d * 30, my + dy / d * 30
-            colour = EDGE_COLOURS[edge["id"]] + (255,)
-            draw.ellipse([tx - 17, ty - 17, tx + 17, ty + 17], fill=colour)
-            centred_text(draw, (tx, ty - 13), str(edge["id"]), font(22, bold=True), (255, 255, 255, 255))
-        if labels:
-            lx, ly = island.get("labelAt", (cx, cy))
-            centred_text(draw, (lx, ly - 22), island["label"], font(34, bold=True), INK)
-            centred_text(draw, (lx, ly + 16), island["note"], font(20), INK)
-        if island.get("tip") and labels:
+            tx, ty = mx + dx / d * 30 * k, my + dy / d * 30 * k
+            r = 17 * k
+            draw.ellipse([tx - r, ty - r, tx + r, ty + r], fill=EDGE_COLOURS[edge["id"]] + (255,))
+            centred_text(draw, (tx, ty - 13 * k), str(edge["id"]), font(22 * k, bold=True), (255, 255, 255, 255))
+        lx, ly = island["labelAt"] or (cx, cy)
+        centred_text(draw, (lx, ly - 22 * k), island["label"], font(34 * k, bold=True), INK)
+        centred_text(draw, (lx, ly + 16 * k), island["note"], font(20 * k), INK)
+        if island["tip"]:
             tx, ty = island["tip"]
-            draw.ellipse([tx - 6, ty - 6, tx + 6, ty + 6], fill=INK)
+            draw.ellipse([tx - 6 * k, ty - 6 * k, tx + 6 * k, ty + 6 * k], fill=INK)
 
-    legend = layout["legend"]
+    size = img.width
     x, y = legend["x"], legend["y"]
     lines = [
-        ("cheese-wedge.png", font(30, bold=True)),
-        ("1024 x 1024", font(22)),
-        ("", font(12)),
-        ("Paint each face inside its outline,", font(19)),
-        ("and a little past it.", font(19)),
-        ("Edges with the same number", font(19)),
-        ("meet on the model.", font(19)),
-        ("The dot marks the tip of the wedge.", font(19)),
-        ("Keep this on the top layer, paint", font(19)),
-        ("below it, hide it before exporting.", font(19)),
+        ("cheese-wedge.png", font(30 * k, bold=True)),
+        (f"{size} x {size}", font(22 * k)),
+        ("", font(12 * k)),
+        ("Edges with the same number", font(19 * k)),
+        ("meet on the model.", font(19 * k)),
+        ("The dot marks the tip of the wedge.", font(19 * k)),
+        ("", font(8 * k)),
+        ("Keep this on the top layer and", font(19 * k)),
+        ("hide it before exporting.", font(19 * k)),
+        ("Paint inside the outlines: the", font(19 * k)),
+        ("gaps get filled in automatically.", font(19 * k)),
     ]
     for text, face in lines:
         draw.text((x, y), text, font=face, fill=INK)
-        y += face.size + 6
+        y += face.size + 6 * k
+
+
+def faces_layer(layout, k):
+    """Just the faces, filled grey: a base layer to clip paint layers to in Procreate."""
+    islands, _ = scaled(layout, k)
+    size = round(layout["size"] * k)
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    for island in islands:
+        draw.polygon(island["outline"], fill=(205, 205, 205, 255))
+    return img
 
 
 def cheese_fill(size, layout, seed=7):
@@ -132,18 +165,20 @@ def cheese_fill(size, layout, seed=7):
 
 def main():
     layout = json.loads((ART / "layout.json").read_text())
-    size = layout["size"]
+    size = int(sys.argv[sys.argv.index("--size") + 1]) if "--size" in sys.argv else DEFAULT_SIZE
+    k = size / layout["size"]
 
     template = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw_guides(template, layout)
+    draw_guides(template, layout, k)
     template.save(ART / "cheese-wedge-uv-template.png")
-    print("wrote art/cheese-wedge/cheese-wedge-uv-template.png")
+    faces_layer(layout, k).save(ART / "cheese-wedge-uv-faces.png")
+    print(f"wrote art/cheese-wedge/cheese-wedge-uv-template.png and cheese-wedge-uv-faces.png ({size} x {size})")
 
     if TEXTURE.exists() and "--force" not in sys.argv:
         print("skip  src/assets/textures/cheese-wedge.png (exists; --force overwrites, careful: replaces real art)")
     else:
-        texture = cheese_fill(size, layout)
-        draw_guides(texture, layout)
+        texture = cheese_fill(layout["size"], layout)
+        draw_guides(texture, layout, 1)
         texture.convert("RGB").save(TEXTURE)
         print("wrote src/assets/textures/cheese-wedge.png (placeholder)")
     shutil.copy(TEXTURE, ART / "cheese-wedge.png")
