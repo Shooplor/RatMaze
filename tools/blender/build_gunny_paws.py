@@ -143,7 +143,7 @@ class Blob:
         e.rotation = Matrix((x, y, z)).transposed().to_quaternion()
 
 
-def build_hand_blob(name, hand, outside):
+def build_hand_blob(name, hand, outside, bends=None):
     """The pink hand: wrist, a long flat palm with tendon ridges, fingers and a thumb."""
     blob = Blob(name)
     w, f, n, idx = hand.wrist, hand.f, hand.n, hand.index
@@ -159,7 +159,7 @@ def build_hand_blob(name, hand, outside):
         blob.capsule(start, end, 0.0058 * S)  # tendon ridges on the back of the hand
 
     for spec in FINGERS:
-        joints, tip_dir, bend_axis = pose_finger(hand, spec, outside)
+        joints, tip_dir, bend_axis = pose_finger(hand, spec, outside, **({"rest_bend": bends} if bends else {}))
         scale = 0.88 if spec is FINGERS[-1] else 1.0
         for i, (a, b) in enumerate(zip(joints, joints[1:])):
             blob.ball(a, JOINT_R[i] * scale)
@@ -276,8 +276,8 @@ def forearm(part, wrist, direction, seed):
 
 # --- Putting a paw together ---------------------------------------------------------------
 
-def paw(name, hand, outside, arm_direction, seed, materials):
-    blob, tips = build_hand_blob(name, hand, outside)
+def paw(name, hand, outside, arm_direction, seed, materials, bends=None):
+    blob, tips = build_hand_blob(name, hand, outside, bends)
     mesh = mesh_from_blob(blob, HAND_TRIANGLES)
 
     extra = Part()
@@ -361,37 +361,64 @@ def unwrap(obj):
 
 # --- The two paws on the gun ----------------------------------------------------------------
 
+# A closed fist: how far each finger joint bends (knuckle, middle, tip), in degrees.
+FIST = (72, 100, 65)
+
+
+def fist_hole():
+    """Where the hole of a closed fist is (what it grips), relative to the wrist along the
+    hand's forward, palm and index directions, and how big it is."""
+    hand = Hand((0, 0, 0), (1, 0, 0), (0, -1, 0), right_handed=True)
+    joints, _, _ = pose_finger(hand, FINGERS[1], lambda p: 1, rest_bend=FIST)
+    a, b, c = joints[0], joints[2], joints[3]
+    ab, ac = b - a, c - a
+    normal = ab.cross(ac)
+    centre = a + (ac.length_squared * normal.cross(ab) + ab.length_squared * ac.cross(normal)) / (2 * normal.length_squared)
+    radius = (centre - a).length - FINGER_R[1]
+    return (centre.dot(hand.f), centre.dot(hand.n), centre.dot(hand.k)), radius
+
+
+# The grip: a round handle tilted back 0.35 rad around (0, -0.112, 0.51), as in
+# src/render/gunView.js. Its radius matches the fist's hole, so the fingers close round it.
+GRIP_CENTRE = Vector((0, -0.112, 0.51))
+GRIP_TILT = 0.35
+
+
 def right_paw(materials):
-    """On the grip: a box 0.04 wide, 0.14 tall, 0.055 deep at (0, -0.1, 0.52), tilted back."""
-    tilt = 0.35
-    g = Vector((0, -0.1, 0.52))
-    u = Vector((1, 0, 0))                              # right
-    v = Vector((0, math.cos(tilt), math.sin(tilt)))    # up the grip
-    w = Vector((0, -math.sin(tilt), math.cos(tilt)))   # back, toward you
-    fr = FINGER_R[0]                                   # finger centres sit this far off the grip
-
-    def outside(p):
-        q = p - g
-        a, b = q.dot(u) / (0.02 + fr), q.dot(w) / (0.0275 + fr)
-        return math.hypot(a, b) - 1
-
-    knuckles = g + u * (0.02 + JOINT_R[0] * 1.1) + w * 0.012 + v * 0.004
-    forward = -w - v * 0.12
-    hand = Hand(knuckles - forward.normalized() * 0.078 * S, forward, -u, right_handed=True)
-    return paw("RightPaw", hand, outside, (0.4, -0.45, 1.0), 21, materials)
+    """A closed fist round the grip: knuckles to the front right, the back of the hand to the
+    right, the forearm back toward you."""
+    u = Vector((1, 0, 0))                                        # right
+    v = Vector((0, math.cos(GRIP_TILT), math.sin(GRIP_TILT)))    # up the grip
+    w = Vector((0, -math.sin(GRIP_TILT), math.cos(GRIP_TILT)))   # back, toward you
+    (cf, cn, ck), hole = fist_hole()
+    f = (-w + u * 0.12).normalized()     # knuckles toward the front, turned a little outward
+    k = v                                # the fingers stack up the grip, index on top
+    n = k.cross(f)                       # so the palm faces the grip
+    centre = GRIP_CENTRE + v * 0.016
+    wrist = centre - f * cf - n * cn - k * ck
+    hand = Hand(wrist, f, n, right_handed=True)
+    print(f"fist hole radius {hole:.4f}: grip half-width and half-depth should be about that")
+    return paw("RightPaw", hand, lambda p: 1, (0.35, -0.4, 1.0), 21, materials, bends=FIST)
 
 
 def left_paw(materials):
-    """Under the barrel: a pipe of radius 0.042 along z; the hand cradles it from below."""
+    """Cradling the barrel (a pipe of radius 0.042 along z) like a rifle's handguard: the palm
+    under it, the fingers wrapping up its far (right) side, the forearm continuing almost
+    straight from the wrist down to the bottom left."""
     reach = 0.042 + FINGER_R[0]
 
     def outside(p):
         return math.hypot(p.x, p.y) / reach - 1
 
-    forward = Vector((1, 0.38, 0))
-    knuckles = Vector((0.004, -(0.042 + JOINT_R[0] * 1.15), 0.2))
-    hand = Hand(knuckles - forward.normalized() * 0.078 * S, forward, (-0.38, 1, 0), right_handed=False)
-    return paw("LeftPaw", hand, outside, (-0.85, -0.5, 1.0), 31, materials)
+    psi = math.radians(-62)              # knuckles below the barrel, toward its far side
+    radius = 0.042 + JOINT_R[0] * 1.15
+    knuckles = Vector((radius * math.cos(psi), radius * math.sin(psi), 0.2))
+    tangent = Vector((-math.sin(psi), math.cos(psi), 0))       # round the barrel, upward
+    forward = (tangent - Vector((0, 0, 0.42))).normalized()   # angled toward the nozzle
+    palm = -Vector((knuckles.x, knuckles.y, 0))                 # facing the barrel
+    hand = Hand(knuckles - forward * 0.078 * S, forward, palm, right_handed=False)
+    arm = (-hand.f + Vector((0, -0.45, 0.15))).normalized()      # a slight bend at the wrist
+    return paw("LeftPaw", hand, outside, arm, 31, materials)
 
 
 def material(name, colour, roughness):

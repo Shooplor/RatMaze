@@ -77,8 +77,8 @@ function buildScrapGun() {
     add(new THREE.SphereGeometry(0.008, 6, 4), MATERIALS.darkSteel, x, y, 0.47);
   }
 
-  // Grip, angled back.
-  add(new THREE.BoxGeometry(0.04, 0.14, 0.055), MATERIALS.grip, 0, -0.1, 0.52, 0.35);
+  // Grip, angled back: a round handle sized for Gunny's closed fist (GRIP in the paws script).
+  add(new THREE.CylinderGeometry(0.024, 0.026, 0.15, 10), MATERIALS.grip, 0, -0.112, 0.51, 0.35);
 
   // Glass jar on top, filled with cheese as you collect, with a hose down to the barrel.
   // The cheese in it steeps in something toxic: it glows gold, bubbles, and lights the gun.
