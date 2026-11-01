@@ -70,7 +70,7 @@ faces layer (2048 × 2048 by default; `--size` changes it).
 | File | What |
 |---|---|
 | Gun model | Gunny's scrap vacuum gun in first person. For now it is a placeholder built in code (`src/render/gunView.js`). Send the model as `.glb` if you can (`.fbx` or `.obj` also work, I'll convert it). I'll fit its size and position on screen and find the nozzle, where the whirlwind starts and shots come out. If it has a part that should spin while sucking, or a cheese jar that fills up, tell me which parts. |
-| `models/gunny-paws.glb` | Gunny's two paws holding the gun in first person: the right paw on the grip, the left cradling the barrel. Built in Blender by `tools/blender/build_gunny_paws.py` (`npm run art:gunny-paws`): pink rat hands with knuckle bulges, long dark claws and a small thumb, fading into thin dark furry forearms. Coloured for now; the model has a UV layout, so a painted texture can go on it later. When the real gun arrives, the paws get re-posed to its grip and barrel. |
+| `models/gunny-paws.glb` | Gunny's two paws holding the gun in first person: the right paw on the grip, the left cradling the barrel. Built in Blender by `tools/blender/build_gunny_paws.py` (`npm run art:gunny-paws`): pink rat hands with knuckle bulges, long dark claws and a jointed thumb (on the grip it folds over the fingers), fading into thin dark furry forearms. Hand and forearm are one piece, with no seam at the wrist. Coloured for now; the model has a UV layout, so a painted texture can go on it later. When the real gun arrives, the paws get re-posed to its grip and barrel. |
 
 ## Coming in later steps
 

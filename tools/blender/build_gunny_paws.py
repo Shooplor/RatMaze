@@ -6,11 +6,12 @@
                                      and a UV layout, ready to be painted later
 
 The paws follow the rat hand references: a long bony hand with tendon ridges on the back,
-four slender fingers with a bulge at every knuckle, long dark hooked claws, a small thumb
-near the wrist, pink hairless skin, and a thin dark furry forearm with spiky tufts at the
-wrist. The hand is modelled as metaballs (spheres and capsules that melt together into
-one smooth shape), turned into a mesh and reduced to low poly. Fingers are posed joint by
-joint, each bending until it touches the gun, so they wrap the grip and the barrel.
+four slender fingers with a bulge at every knuckle, long dark hooked claws, a jointed
+thumb, pink hairless skin, and a thin dark furry forearm with spiky tufts at the wrist.
+The hand and forearm are modelled together as metaballs (spheres and capsules that melt
+together into one smooth shape), so the wrist has no seam, then turned into a mesh and
+reduced to low poly. Fingers are posed joint by joint, each bending until it touches the
+gun, so they wrap the grip and the barrel; in the fist the thumb folds over the fingers.
 
 Everything is placed in the gun model's own coordinates (as in src/render/gunView.js:
 y up, the nozzle at the origin, the gun running back along +z), so the game attaches
@@ -26,7 +27,7 @@ import random
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Matrix, Quaternion, Vector, noise
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "src" / "assets" / "models" / "gunny-paws.glb"
@@ -39,8 +40,10 @@ CLAW = (0.07, 0.052, 0.048)   # #4a3f3c dark horn
 
 S = 1.6             # overall paw size (the hand's measurements below are multiplied by it)
 MB_SCALE = 0.53     # a metaball's visible radius is about this share of its radius
+CHAIN_SCALE = 0.696  # the same for balls packed every 0.3 radius along a line (measured)
+CHAIN_SPACING = 0.3
 MB_RESOLUTION = 0.0024
-HAND_TRIANGLES = 2400  # per hand, after reduction
+HAND_TRIANGLES = 3000  # per hand and forearm, after reduction
 
 
 def to_blender(v):
@@ -85,8 +88,13 @@ def pose_finger(hand, spec, outside, max_bend=(70, 75, 60), rest_bend=(16, 24, 1
     across, reach, splay, lengths = spec
     base = hand.wrist + hand.f * reach + hand.index * across
     direction = rotate(hand.f, hand.n, splay if hand.index == hand.k else -splay)
+    return pose_chain(base, direction, hand.n, lengths, outside, max_bend, rest_bend)
+
+
+def pose_chain(base, direction, toward, lengths, outside, max_bend, rest_bend):
+    """Joint positions for a chain of bones from `base`, curling toward `toward`."""
     joints = [base]
-    bend_axis = direction.cross(hand.n).normalized()
+    bend_axis = direction.cross(toward).normalized()
     total = 0.0
     for length, most, least in zip(lengths, max_bend, rest_bend):
         chosen = least  # nothing to hold here: the joint stays relaxed
@@ -130,6 +138,22 @@ class Blob:
         e.size_x = max(0.0001, (b - a).length / 2 - radius * 0.45)
         e.rotation = Vector((1, 0, 0)).rotation_difference((to_blender(b) - to_blender(a)).normalized())
 
+    def chain(self, path):
+        """A smooth, tapering limb along `path` (a list of (point, radius), closely spaced).
+        Balls packed tightly along a line melt into an even tube, with none of the bulges
+        overlapping capsules make, so the radius can change gradually."""
+        travelled, next_ball = 0.0, 0.0
+        for (a, ra), (b, rb) in zip(path, path[1:]):
+            length = (b - a).length
+            while next_ball <= travelled + length:
+                t = (next_ball - travelled) / length
+                r = ra + (rb - ra) * t
+                e = self.mb.elements.new(type="BALL")
+                e.co = to_blender(a.lerp(b, t))
+                e.radius = r / CHAIN_SCALE
+                next_ball += e.radius * CHAIN_SPACING
+            travelled += length
+
     def ellipsoid(self, at, x_axis, y_axis, sizes, radius):
         """An ellipsoid with its long axes along x_axis / y_axis (gun coordinates)."""
         e = self.mb.elements.new(type="ELLIPSOID")
@@ -143,51 +167,110 @@ class Blob:
         e.rotation = Matrix((x, y, z)).transposed().to_quaternion()
 
 
-def build_hand_blob(name, hand, outside, bends=None):
-    """The pink hand: wrist, a long flat palm with tendon ridges, fingers and a thumb."""
+# The thumb: bone lengths (metacarpal, then the two phalanges) and visible radii.
+THUMB_LENGTHS = (0.036 * S, 0.027 * S, 0.021 * S)
+THUMB_R = (0.0074 * S, 0.0061 * S, 0.0053 * S)
+THUMB_JOINT_R = (0.0072 * S, 0.0064 * S)
+
+
+def build_hand_blob(name, hand, outside, arm, fist=False, thumb_aim=None):
+    """The pink hand and its forearm as one body: the forearm, a long flat palm with tendon
+    ridges, fingers and a thumb."""
     blob = Blob(name)
     w, f, n, idx = hand.wrist, hand.f, hand.n, hand.index
     tips = []
 
-    # Wrist and the flat, bony back of the hand.
-    blob.capsule(w - f * 0.022 * S, w + f * 0.012 * S, 0.0145 * S)
-    # Ellipsoid sizes are shares of its radius: about 0.12 long, 0.1 wide, 0.025 thick at S 1.6.
+    # The forearm and wrist, running into the heel of the hand, and the flat, bony back of
+    # the hand. Ellipsoid sizes are shares of its radius: about 0.12 long, 0.1 wide, 0.025
+    # thick at S 1.6.
+    blob.chain([(p, r) for p, r, _ in arm])
     blob.ellipsoid(w + f * 0.042 * S + n * 0.002 * S, f, idx, (0.72, 0.58, 0.15), 0.05 * S)
     for across, reach, _, _ in FINGERS:
         start = w + f * 0.012 * S + idx * across * 0.45 - n * 0.006 * S
         end = w + f * (reach - 0.008 * S) + idx * across - n * 0.0045 * S
         blob.capsule(start, end, 0.0058 * S)  # tendon ridges on the back of the hand
 
+    fingers = []
     for spec in FINGERS:
-        joints, tip_dir, bend_axis = pose_finger(hand, spec, outside, **({"rest_bend": bends} if bends else {}))
+        joints, tip_dir, bend_axis = pose_finger(hand, spec, outside, **({"rest_bend": FIST} if fist else {}))
         scale = 0.88 if spec is FINGERS[-1] else 1.0
         for i, (a, b) in enumerate(zip(joints, joints[1:])):
             blob.ball(a, JOINT_R[i] * scale)
             blob.capsule(a, b, FINGER_R[i] * scale)
         blob.ball(joints[-1], FINGER_R[-1] * 0.95 * scale)
         tips.append((joints[-1], tip_dir, bend_axis, scale))
+        fingers.append(joints)
 
-    # A small thumb near the wrist on the index side, pointing forward along the hand.
-    t0 = w + f * 0.018 * S + idx * 0.022 * S + n * 0.006 * S
-    t_dir = (f * 0.8 + idx * 0.45 + n * 0.35).normalized()
-    t1 = t0 + t_dir * 0.016 * S
-    t2 = t1 + rotate(t_dir, t_dir.cross(n), 25) * 0.012 * S
-    blob.capsule(t0, t1, 0.0068 * S)
-    blob.ball(t1, 0.0066 * S)
-    blob.capsule(t1, t2, 0.0056 * S)
-    tips.append((t2, (t2 - t1).normalized(), t_dir.cross(n).normalized(), 0.75))
+    joints, tip_dir, bend_axis = fist_thumb(hand, *fingers[:2]) if fist else posed_thumb(hand, outside, thumb_aim)
+    for i, (a, b) in enumerate(zip(joints, joints[1:])):
+        if i:
+            blob.ball(a, THUMB_JOINT_R[i - 1])
+        blob.capsule(a, b, THUMB_R[i])
+    blob.ball(joints[-1], THUMB_R[-1] * 0.95)
+    tips.append((joints[-1], tip_dir, bend_axis, 0.8))
     return blob, tips
 
 
-def mesh_from_blob(blob, target_triangles):
-    """Turns the metaballs into a mesh and reduces it to about `target_triangles`."""
+def thumb_base(hand):
+    """Where the thumb leaves the hand: the heel of the palm, on the index side."""
+    return hand.wrist + hand.f * 0.014 * S + hand.index * 0.025 * S + hand.n * 0.007 * S
+
+
+def posed_thumb(hand, outside, aim=None):
+    """An open or holding hand's thumb: out from the heel of the palm, forward and a little
+    to the palm side (or toward `aim`, a point it reaches for), curling toward the palm until
+    it touches whatever the hand holds."""
+    f, n, idx = hand.f, hand.n, hand.index
+    base = thumb_base(hand)
+    direction = (aim - base).normalized() if aim else (f * 0.75 + idx * 0.5 + n * 0.3).normalized()
+    toward = (n - idx * 0.4).normalized()  # a thumb curls across the palm
+    toward = (toward - direction * toward.dot(direction)).normalized()
+    return pose_chain(base, direction, toward, THUMB_LENGTHS, outside,
+                      max_bend=(30, 55, 50), rest_bend=(8, 16, 14) if aim is None else (2, 8, 8))
+
+
+def fist_thumb(hand, index, middle):
+    """A closed fist's thumb: from the heel of the palm, up past the curled index finger,
+    then folded across the middle bones of the index and middle fingers, the way a thumb
+    locks a fist round a handle."""
+    w, f, n, idx = hand.wrist, hand.f, hand.n, hand.index
+    gap = 0.0045 * S  # metaballs closer than this would melt the thumb into the fingers
+
+    def over(joints, share, radius):
+        """A point lying on a finger's middle bone, and the way out from the fist there."""
+        a, b = joints[1], joints[2]
+        bone = (b - a).normalized()
+        out = (n - bone * n.dot(bone)).normalized()
+        return a.lerp(b, share) + out * (FINGER_R[1] + gap + radius), out
+
+    knuckle = w + f * 0.056 * S + n * 0.05 * S + idx * 0.038 * S  # beside the index finger
+    bend, _ = over(index, 0.3, THUMB_JOINT_R[1])
+    tip, out = over(middle, 0.4, THUMB_R[2])
+    tip_dir = (tip - bend).normalized()
+    return [thumb_base(hand), knuckle, bend, tip], tip_dir, out.cross(tip_dir).normalized()
+
+
+def mesh_from_blob(blob, target_triangles, shape=None, detail=None):
+    """Turns the metaballs into a mesh, lets `shape` move its vertices, and reduces it to
+    about `target_triangles`. `detail(p)` (0 to 1 at a point in gun coordinates) says where
+    to keep the most triangles."""
     depsgraph = bpy.context.evaluated_depsgraph_get()
     dense = bpy.data.meshes.new_from_object(blob.obj.evaluated_get(depsgraph))
+    if shape:
+        shape(dense)
+        dense.update()
     temp = bpy.data.objects.new("dense", dense)
     bpy.context.scene.collection.objects.link(temp)
     tris = sum(len(p.vertices) - 2 for p in dense.polygons)
     decimate = temp.modifiers.new("decimate", "DECIMATE")
     decimate.ratio = min(1.0, target_triangles / max(1, tris))
+    if detail:
+        # The decimator collapses low-weight edges last (and zero-weight ones never).
+        group = temp.vertex_groups.new(name="detail")
+        for v in dense.vertices:
+            group.add([v.index], 1 - 0.95 * detail(Vector((v.co.x, v.co.z, -v.co.y))), "REPLACE")
+        decimate.vertex_group = "detail"
+        decimate.vertex_group_factor = 0.3
     depsgraph = bpy.context.evaluated_depsgraph_get()
     low = bpy.data.meshes.new_from_object(temp.evaluated_get(depsgraph))
     bpy.data.objects.remove(temp)
@@ -195,7 +278,64 @@ def mesh_from_blob(blob, target_triangles):
     return low
 
 
-# --- Hard pieces: claws and the furry forearm -------------------------------------------
+# --- The forearm ---------------------------------------------------------------------------
+
+# How thick the wrist and forearm are (visible radius) by distance along them from the heel
+# of the hand: slim at the wrist, widening into the forearm, which runs on out of view.
+ARM_PROFILE = [(0, 0.0135 * S), (0.035 * S, 0.0138 * S), (0.065 * S, 0.018 * S), (0.12 * S, 0.025 * S),
+               (0.2 * S, 0.031 * S), (0.25, 0.034 * S), (0.45, 0.038 * S), (0.7, 0.04 * S)]
+
+
+def arm_path(hand, direction):
+    """The wrist and forearm's centre line as (point, radius, distance along) samples: back
+    from the heel of the hand, curving smoothly at the wrist into the forearm's direction."""
+    d = Vector(direction).normalized()
+    start = hand.wrist + hand.f * 0.012 * S
+    corner = hand.wrist - hand.f * 0.03 * S
+    bent = corner + d * 0.05 * S
+    points = [start * (1 - t) ** 2 + corner * 2 * (1 - t) * t + bent * t * t for t in (i / 16 for i in range(17))]
+    length = sum((b - a).length for a, b in zip(points, points[1:]))
+    steps = math.ceil((ARM_PROFILE[-1][0] - length) / 0.01)
+    points += [bent + d * (ARM_PROFILE[-1][0] - length) * i / steps for i in range(1, steps + 1)]
+    path, along = [], 0.0
+    for i, p in enumerate(points):
+        if i:
+            along += (p - points[i - 1]).length
+        path.append((p, profile(ARM_PROFILE, along), along))
+    return path
+
+
+def profile(table, x):
+    """Linear interpolation in a [(x, value), ...] table."""
+    for (x0, v0), (x1, v1) in zip(table, table[1:]):
+        if x <= x1:
+            return v0 + (v1 - v0) * max(0.0, (x - x0) / (x1 - x0))
+    return table[-1][1]
+
+
+def furry(hand, arm):
+    """Roughens the forearm's surface into ragged fur: each vertex moves in or out along its
+    normal by a smooth noise, stretched along the arm so it reads as tufts and streaks. The
+    effect fades in past the wrist, so the hand stays smooth."""
+    d = (arm[-1][0] - arm[-12][0]).normalized()
+    a1 = d.orthogonal().normalized()
+    a2 = d.cross(a1)
+
+    def shape(mesh):
+        for v in mesh.vertices:
+            p = Vector((v.co.x, v.co.z, -v.co.y))  # back to gun coordinates
+            along = (p - hand.wrist).dot(hand.f)
+            weight = min(1.0, max(0.0, (-0.03 * S - along) / (0.05 * S)))
+            if weight <= 0:
+                continue
+            q = Vector((p.dot(a1) * 60 / S, p.dot(a2) * 60 / S, p.dot(d) * 16 / S))
+            bump = noise.noise(q)
+            bump = math.copysign(abs(bump) ** 0.7, bump)  # sharper tufts than plain noise
+            v.co += v.normal * bump * 0.0042 * S * weight
+    return shape
+
+
+# --- Hard pieces: claws and fur tufts ---------------------------------------------------------
 
 class Part:
     """Extra vertices and faces (in Blender coordinates) added to a hand's mesh."""
@@ -204,9 +344,8 @@ class Part:
         self.verts, self.faces, self.materials = [], [], []
 
 
-def tube(part, points, radii, material, sides=6, tip=False, jitter=0.0, seed=0):
+def tube(part, points, radii, material, sides=6, tip=False):
     """A tapered tube through `points` (gun coordinates); `tip` closes it to a point."""
-    rng = random.Random(seed)
     pts = [Vector(p) for p in points]
     n = len(pts)
     tangents = [(pts[min(n - 1, i + 1)] - pts[max(0, i - 1)]).normalized() for i in range(n)]
@@ -223,7 +362,7 @@ def tube(part, points, radii, material, sides=6, tip=False, jitter=0.0, seed=0):
         ring = []
         for k in range(sides):
             a = 2 * math.pi * k / sides
-            r = radii[i] * (1 + rng.uniform(-jitter, jitter))
+            r = radii[i]
             ring.append(len(part.verts))
             part.verts.append(to_blender(pts[i] + side * math.cos(a) * r + up * math.sin(a) * r))
         rings.append(ring)
@@ -256,54 +395,48 @@ def claw(part, tip, direction, bend_axis, scale):
     tube(part, pts, radii, 2, sides=6, tip=True)
 
 
-def forearm(part, wrist, direction, seed):
-    """A thin, dark, furry forearm from the wrist out of view, with spiky tufts at the wrist."""
-    d = Vector(direction).normalized()
-    w = Vector(wrist)
-    pts = [w + d * 0.012 * S, w + d * 0.05 * S, w + d * 0.12 * S, w + d * 0.25, w + d * 0.45, w + d * 0.75]
-    radii = [r * S for r in (0.0175, 0.023, 0.03, 0.036, 0.04, 0.042)]
-    tube(part, pts, radii, 1, sides=8, jitter=0.12, seed=seed)
+def wrist_tufts(part, arm, seed):
+    """Spiky tufts of fur sticking out round the wrist, pointing toward the hand."""
     rng = random.Random(seed + 1)
-    side = d.orthogonal().normalized()
-    up = d.cross(side)
     for k in range(6):
+        reach = rng.uniform(0.05, 0.08) * S
+        i = next(i for i, (_, _, along) in enumerate(arm) if along >= reach)
+        (p, r, _), (q, _, _) = arm[i], arm[i + 1]
+        d = (q - p).normalized()
+        side = d.orthogonal().normalized()
         a = 2 * math.pi * (k + rng.uniform(-0.3, 0.3)) / 6
-        radial = side * math.cos(a) + up * math.sin(a)
-        base = w + d * rng.uniform(0.02, 0.04) * S + radial * 0.016 * S
+        radial = Quaternion(d, a) @ side
+        base = p + radial * r * 0.85
         spike = base + (-d * rng.uniform(0.012, 0.02) + radial * rng.uniform(0.01, 0.018)) * S
         tube(part, [base, (base + spike) / 2, spike], [0.0018 * S, 0.001 * S, 0], 1, sides=4, tip=True)
 
 
 # --- Putting a paw together ---------------------------------------------------------------
 
-def paw(name, hand, outside, arm_direction, seed, materials, bends=None):
-    blob, tips = build_hand_blob(name, hand, outside, bends)
-    mesh = mesh_from_blob(blob, HAND_TRIANGLES)
+def paw(name, hand, outside, arm_direction, seed, materials, fist=False, thumb_aim=None):
+    arm = arm_path(hand, arm_direction)
+    blob, tips = build_hand_blob(name, hand, outside, arm, fist, thumb_aim)
+
+    def hand_detail(p):
+        """Most of the triangles go to the hand; the plainer forearm needs fewer."""
+        return min(1.0, max(0.0, ((p - hand.wrist).dot(hand.f) + 0.06 * S) / (0.04 * S)))
+
+    body = mesh_from_blob(blob, HAND_TRIANGLES, furry(hand, arm), hand_detail)
 
     extra = Part()
     for tip, direction, bend_axis, scale in tips:
         claw(extra, tip, direction, bend_axis, scale)
-    forearm(extra, hand.wrist - hand.f * 0.02 * S, arm_direction, seed)
+    wrist_tufts(extra, arm, seed)
 
-    # Append the claws and forearm to the hand mesh.
-    base = len(mesh.vertices)
-    mesh.vertices.add(len(extra.verts))
-    for i, v in enumerate(extra.verts):
-        mesh.vertices[base + i].co = v
-    first_poly = len(mesh.polygons)
-    loops = sum(len(f) for f in extra.faces)
-    loop_start = len(mesh.loops)
-    mesh.loops.add(loops)
-    mesh.polygons.add(len(extra.faces))
-    cursor = loop_start
-    for j, face in enumerate(extra.faces):
-        poly = mesh.polygons[first_poly + j]
-        poly.loop_start = cursor
-        for k, vi in enumerate(face):
-            mesh.loops[cursor + k].vertex_index = base + vi
-        cursor += len(face)
+    # One mesh: the hand, then the claws and tufts.
+    base, first_poly = len(body.vertices), len(body.polygons)
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(
+        [v.co.copy() for v in body.vertices] + extra.verts, [],
+        [p.vertices[:] for p in body.polygons] + [[base + i for i in face] for face in extra.faces],
+    )
     mesh.update(calc_edges=True)
-    mesh.validate()
+    bpy.data.meshes.remove(body)
 
     for m in materials:
         mesh.materials.append(m)
@@ -313,7 +446,7 @@ def paw(name, hand, outside, arm_direction, seed, materials, bends=None):
             poly.use_smooth = True
         else:
             poly.material_index = extra.materials[j - first_poly]
-            poly.use_smooth = extra.materials[j - first_poly] == 1  # fur smooth, claws crisp
+            poly.use_smooth = extra.materials[j - first_poly] == 1  # tufts smooth, claws crisp
 
     colour_vertices(mesh, hand, base, seed)
 
@@ -394,11 +527,11 @@ def right_paw(materials):
     f = (-w + u * 0.12).normalized()     # knuckles toward the front, turned a little outward
     k = v                                # the fingers stack up the grip, index on top
     n = k.cross(f)                       # so the palm faces the grip
-    centre = GRIP_CENTRE + v * 0.016
+    centre = GRIP_CENTRE + v * 0.006     # the index finger just clears the motor block
     wrist = centre - f * cf - n * cn - k * ck
     hand = Hand(wrist, f, n, right_handed=True)
     print(f"fist hole radius {hole:.4f}: grip half-width and half-depth should be about that")
-    return paw("RightPaw", hand, lambda p: 1, (0.35, -0.4, 1.0), 21, materials, bends=FIST)
+    return paw("RightPaw", hand, lambda p: 1, (0.35, -0.4, 1.0), 21, materials, fist=True)
 
 
 def left_paw(materials):
@@ -418,7 +551,10 @@ def left_paw(materials):
     palm = -Vector((knuckles.x, knuckles.y, 0))                 # facing the barrel
     hand = Hand(knuckles - forward * 0.078 * S, forward, palm, right_handed=False)
     arm = (-hand.f + Vector((0, -0.45, 0.15))).normalized()      # a slight bend at the wrist
-    return paw("LeftPaw", hand, outside, arm, 31, materials)
+    # The thumb lies along the barrel's near side, pointing forward.
+    base = thumb_base(hand)
+    aim = Vector((-(0.042 + THUMB_R[1] + 0.003), -0.022, base.z - 0.12))
+    return paw("LeftPaw", hand, outside, arm, 31, materials, thumb_aim=aim)
 
 
 def material(name, colour, roughness):
